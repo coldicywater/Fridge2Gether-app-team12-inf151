@@ -1,0 +1,11 @@
+{
+  "title": "inf 151 Team 12",
+  "description": "Organize and manage groceries with sections for Personal, Shared, and Almost Expired items, plus a streamlined scan feature detecting multiple items at once for easy tracking.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
