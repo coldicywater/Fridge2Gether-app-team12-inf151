@@ -1,0 +1,3 @@
+# Small binary assets in the iOS app are stored directly in git, not LFS.
+*.png -filter -diff -merge binary
+*.ttf -filter -diff -merge binary

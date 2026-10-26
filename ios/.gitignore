@@ -1,0 +1,8 @@
+Secrets.xcconfig
+GoogleService-Info.plist
+Fridge2Gether/GoogleService-Info.plist
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcuserdata/
+DerivedData/
+.DS_Store
+build/
