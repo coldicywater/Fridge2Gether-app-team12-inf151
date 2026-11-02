@@ -59,18 +59,13 @@ struct ScanFlowView: View {
                 .foregroundStyle(.white.opacity(0.85))
             }
 
-            RoundedRectangle(cornerRadius: 25)
-                .stroke(.white.opacity(0.85), lineWidth: 2)
-                .frame(width: 230, height: 230)
-                .opacity(camera.isAvailable ? 1 : 0)
-
             VStack {
                 HStack {
                     RoundBackButton(dark: true) { onDone() }
                     Spacer()
                 }
                 Spacer()
-                Label("Fit all your groceries in the frame", systemImage: "sparkles")
+                Label("Get all your groceries in the photo", systemImage: "sparkles")
                     .font(AppFont.rounded(14, .heavy))
                     .foregroundStyle(.white)
                     .shadow(radius: 4)
