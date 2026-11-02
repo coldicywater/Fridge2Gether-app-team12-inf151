@@ -13,6 +13,7 @@ struct ScanFlowView: View {
     @State private var items: [DetectedItem] = []
     @State private var aiNote: String?
     @State private var pickerItem: PhotosPickerItem?
+    @State private var focusPoint: CGPoint?
 
     var body: some View {
         Group {
@@ -40,13 +41,29 @@ struct ScanFlowView: View {
         ZStack {
             Color(hex: 0x142522).ignoresSafeArea()
             if camera.isAvailable {
-                CameraPreview(session: camera.session)
-                    .ignoresSafeArea()
-                    .overlay(
-                        LinearGradient(colors: [Color(hex: 0x10201F, opacity: 0.45), .clear, .clear, Color(hex: 0x10201F, opacity: 0.8)],
-                                       startPoint: .top, endPoint: .bottom)
+                CameraPreview(session: camera.session) { viewPoint, devicePoint in
+                    camera.focus(at: devicePoint)
+                    showFocus(at: viewPoint)
+                }
+                .ignoresSafeArea()
+                .overlay(
+                    LinearGradient(colors: [Color(hex: 0x10201F, opacity: 0.45), .clear, .clear, Color(hex: 0x10201F, opacity: 0.8)],
+                                   startPoint: .top, endPoint: .bottom)
+                        .ignoresSafeArea()
+                        .allowsHitTesting(false) // let taps reach the preview for focusing
+                )
+                .overlay(alignment: .topLeading) {
+                    if let focusPoint {
+                        // Yellow square where you tapped, like the Camera app.
+                        RoundedRectangle(cornerRadius: 4)
+                            .stroke(Color(hex: 0xF5BD3F), lineWidth: 1.5)
+                            .frame(width: 74, height: 74)
+                            .position(focusPoint)
                             .ignoresSafeArea()
-                    )
+                            .allowsHitTesting(false)
+                            .transition(.opacity)
+                    }
+                }
             } else {
                 VStack(spacing: 10) {
                     Image(systemName: camera.permissionDenied ? "camera.badge.ellipsis" : "photo.on.rectangle")
@@ -65,7 +82,7 @@ struct ScanFlowView: View {
                     Spacer()
                 }
                 Spacer()
-                Label("Get all your groceries in the photo", systemImage: "sparkles")
+                Label("Get all your groceries in the photo. Tap to focus.", systemImage: "sparkles")
                     .font(AppFont.rounded(14, .heavy))
                     .foregroundStyle(.white)
                     .shadow(radius: 4)
@@ -135,6 +152,14 @@ struct ScanFlowView: View {
     }
 
     // MARK: Logic
+
+    private func showFocus(at point: CGPoint) {
+        withAnimation(.easeOut(duration: 0.15)) { focusPoint = point }
+        let shown = point
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+            if focusPoint == shown { withAnimation(.easeOut(duration: 0.3)) { focusPoint = nil } }
+        }
+    }
 
     private func retake() {
         items = []
