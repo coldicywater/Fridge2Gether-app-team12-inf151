@@ -71,6 +71,14 @@ struct RecipeDetailView: View {
                         .buttonStyle(PrimaryButtonStyle())
                         .disabled(recipe.steps.isEmpty)
                         .padding(.top, 20)
+                    if recipe.steps.isEmpty {
+                        Text("This recipe came back without steps. Go back and tap New ideas.")
+                            .font(AppFont.rounded(12, .semibold))
+                            .foregroundStyle(Palette.muted)
+                            .frame(maxWidth: .infinity)
+                            .multilineTextAlignment(.center)
+                            .padding(.top, 8)
+                    }
                 }
                 .padding(EdgeInsets(top: 18, leading: 20, bottom: 20, trailing: 20))
             }
@@ -234,7 +242,7 @@ struct UpdateIngredientsView: View {
                     .font(AppFont.rounded(27, .black))
                     .padding(.top, 3)
                     .padding(.bottom, 5)
-                Text("Set how much is left. Nothing changes until you save.")
+                Text("We estimated what’s left from the recipe. Adjust anything, then save.")
                     .font(AppFont.rounded(13, .semibold))
                     .foregroundStyle(Color(hex: 0x62736F))
                     .padding(.bottom, 16)
@@ -260,7 +268,7 @@ struct UpdateIngredientsView: View {
                             }
                             PortionSelector(
                                 value: Binding(
-                                    get: { portions[food.id] ?? PortionSelector.snap(food.amount / max(food.fullAmount, 0.01)) },
+                                    get: { portions[food.id] ?? estimatedPortion(for: food) },
                                     set: { portions[food.id] = $0 }
                                 ),
                                 compact: true
@@ -290,11 +298,14 @@ struct UpdateIngredientsView: View {
         .background(ScreenBackground())
     }
 
+    /// Every ingredient gets saved, not only the ones you tapped. Untouched ones use the estimate.
     private func save() {
         saving = true
         let updates = fridgeFoods.compactMap { food -> (Food, Double)? in
-            guard let portion = portions[food.id] else { return nil }
-            return (food, (food.fullAmount * portion * 100).rounded() / 100)
+            let portion = portions[food.id] ?? estimatedPortion(for: food)
+            let amount = (food.fullAmount * portion * 100).rounded() / 100
+            guard abs(amount - food.amount) > 0.001 else { return nil }
+            return (food, amount)
         }
         Task {
             for (food, amount) in updates {
@@ -303,5 +314,70 @@ struct UpdateIngredientsView: View {
             saving = false
             onGoHome()
         }
+    }
+
+    // MARK: Estimate what's left
+
+    /// Remaining level after cooking, as one of the portion cups.
+    /// Uses the recipe amount when it can be compared with the fridge amount ("2 eggs" vs "6 pieces",
+    /// "200 g" vs "500 g"); otherwise assumes about half of what's there was used.
+    private func estimatedPortion(for food: Food) -> Double {
+        let full = max(food.fullAmount, 0.01)
+        let used = recipe.ingredients
+            .filter { $0.foodId == food.id }
+            .compactMap { usedAmount($0.amount, food: food) }
+        let remaining: Double
+        if used.isEmpty {
+            remaining = food.amount / 2
+        } else {
+            remaining = food.amount - used.reduce(0, +)
+        }
+        return PortionSelector.snap(max(remaining, 0) / full)
+    }
+
+    private static let measureUnits: Set<String> = [
+        "g", "gram", "grams", "kg", "ml", "l", "liter", "liters", "litre", "litres",
+        "oz", "ounce", "ounces", "lb", "lbs", "pound", "pounds",
+        "cup", "cups", "tbsp", "tablespoon", "tablespoons", "tsp", "teaspoon", "teaspoons",
+    ]
+
+    /// Amount used, in the fridge item's own unit, or nil when the two can't be compared.
+    private func usedAmount(_ text: String, food: Food) -> Double? {
+        guard let parsed = Self.leadingNumber(text), parsed.0 > 0 else { return nil }
+        let number = parsed.0
+        let rest = parsed.1
+        let recipeUnit = rest.lowercased().split(separator: " ").first.map(String.init) ?? ""
+        let fridgeUnit = food.unit.lowercased().split(separator: " ").first.map(String.init) ?? ""
+        let recipeIsMeasure = Self.measureUnits.contains(recipeUnit)
+        let fridgeIsMeasure = Self.measureUnits.contains(fridgeUnit)
+        if recipeIsMeasure && fridgeIsMeasure {
+            // Same unit (ignoring a plural s) can be subtracted directly.
+            let a = recipeUnit.hasSuffix("s") ? String(recipeUnit.dropLast()) : recipeUnit
+            let b = fridgeUnit.hasSuffix("s") ? String(fridgeUnit.dropLast()) : fridgeUnit
+            return a == b ? number : nil
+        }
+        // Both are counts ("2 large", "2 pieces").
+        if !recipeIsMeasure && !fridgeIsMeasure { return number }
+        return nil
+    }
+
+    /// "1.5 cups" → (1.5, "cups"), "1/2 onion" → (0.5, "onion"), "½ cup" → (0.5, "cup").
+    private static func leadingNumber(_ text: String) -> (Double, String)? {
+        let trimmed = text.trimmingCharacters(in: .whitespaces)
+        let fractions: [Character: Double] = ["¼": 0.25, "½": 0.5, "¾": 0.75, "⅓": 1.0 / 3, "⅔": 2.0 / 3]
+        if let first = trimmed.first, let value = fractions[first] {
+            return (value, String(trimmed.dropFirst()).trimmingCharacters(in: .whitespaces))
+        }
+        let scanner = Scanner(string: trimmed)
+        guard var value = scanner.scanDouble() else { return nil }
+        if scanner.scanString("/") != nil, let denominator = scanner.scanDouble(), denominator > 0 {
+            value /= denominator
+        }
+        var rest = String(trimmed[scanner.currentIndex...]).trimmingCharacters(in: .whitespaces)
+        if let first = rest.first, let extra = fractions[first] {
+            value += extra
+            rest = String(rest.dropFirst()).trimmingCharacters(in: .whitespaces)
+        }
+        return (value, rest)
     }
 }

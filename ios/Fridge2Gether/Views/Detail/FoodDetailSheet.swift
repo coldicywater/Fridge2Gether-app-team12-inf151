@@ -8,12 +8,13 @@ struct FoodDetailSheet: View {
     let foodId: String
     let onWhatCanIMake: () -> Void
 
-    private enum Panel { case main, quantity, share, rescue, usedUp }
+    private enum Panel { case main, quantity, share, rescue, usedUp, expiry }
 
     @State private var panel: Panel = .main
     @State private var portion: Double = 1
     @State private var sharing: Sharing = .justMe
     @State private var selected: Set<String> = []
+    @State private var expiryDraft = Date()
     @State private var loaded = false
 
     var body: some View {
@@ -26,6 +27,8 @@ struct FoodDetailSheet: View {
             }
         }
         .background(Palette.card.ignoresSafeArea())
+        // The sheet covers MainView, so failed saves have to be shown here too.
+        .storeErrorAlert()
     }
 
     private func content(_ food: Food) -> some View {
@@ -68,6 +71,7 @@ struct FoodDetailSheet: View {
                 case .usedUp: usedUpPanel(food)
                 case .share: sharePanel(food)
                 case .rescue: rescuePanel(food)
+                case .expiry: expiryPanel(food)
                 }
             }
             .padding(.horizontal, 20)
@@ -119,6 +123,13 @@ struct FoodDetailSheet: View {
             if !almostExpired && isMine {
                 shareButton(title: "Change sharing") { panel = .share }
             }
+            Button {
+                expiryDraft = food.expiry
+                panel = .expiry
+            } label: {
+                Label("Edit expiry date", systemImage: "calendar")
+            }
+            .buttonStyle(SecondaryButtonStyle())
         }
     }
 
@@ -137,6 +148,23 @@ struct FoodDetailSheet: View {
                 let amount = (food.fullAmount * portion * 100).rounded() / 100
                 Task { await store.setAmount(food, amount: amount) }
                 if amount <= 0 { dismiss() } else { panel = .main }
+            }
+            .buttonStyle(PrimaryButtonStyle())
+            cancelButton
+        }
+    }
+
+    private func expiryPanel(_ food: Food) -> some View {
+        VStack(alignment: .leading, spacing: 11) {
+            panelHeading("When does it expire?", detail: nil)
+            DatePicker("Expiry date", selection: $expiryDraft, displayedComponents: .date)
+                .datePickerStyle(.graphical)
+                .labelsHidden()
+                .tint(Palette.green)
+            Button("Save expiry date") {
+                let date = expiryDraft
+                Task { await store.setExpiry(food, date: date) }
+                panel = .main
             }
             .buttonStyle(PrimaryButtonStyle())
             cancelButton

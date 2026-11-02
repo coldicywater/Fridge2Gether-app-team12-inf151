@@ -56,6 +56,8 @@ struct OnboardingView: View {
         .foregroundStyle(Palette.ink)
         .disabled(busy)
         .overlay { if busy { ProgressView().tint(Palette.ink).scaleEffect(1.3) } }
+        // After leaving your only fridge, your name is kept so you don't have to type it again.
+        .onAppear { if name.isEmpty { name = store.userName } }
     }
 
     @ViewBuilder private var content: some View {

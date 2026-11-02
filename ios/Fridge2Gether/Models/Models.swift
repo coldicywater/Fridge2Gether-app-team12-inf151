@@ -72,9 +72,14 @@ struct Food: Identifiable, Codable, Hashable {
 
     var quantityLabel: String { "\(Food.format(amount)) \(unit)" }
 
+    /// Decoded once and cached. Decoding base64 on every render made the Recipes page lag.
     var image: UIImage? {
-        guard let imageData, let data = Data(base64Encoded: imageData) else { return nil }
-        return UIImage(data: data)
+        guard let imageData else { return nil }
+        let key = "\(id)#\(imageData.utf8.count)" as NSString
+        if !id.isEmpty, let cached = FoodImageCache.shared.object(forKey: key) { return cached }
+        guard let data = Data(base64Encoded: imageData), let decoded = UIImage(data: data) else { return nil }
+        if !id.isEmpty { FoodImageCache.shared.setObject(decoded, forKey: key) }
+        return decoded
     }
 
     func isVisible(to uid: String) -> Bool {
@@ -89,6 +94,15 @@ struct Food: Identifiable, Codable, Hashable {
     }
 }
 
+/// Decoded food stickers, keyed by food id + data length.
+enum FoodImageCache {
+    static let shared: NSCache<NSString, UIImage> = {
+        let cache = NSCache<NSString, UIImage>()
+        cache.countLimit = 300
+        return cache
+    }()
+}
+
 // MARK: - Fridge (household)
 
 /// fridges/{id}. Roommates join with the invite code.
@@ -101,6 +115,16 @@ struct Fridge: Codable {
 
     enum CodingKeys: String, CodingKey {
         case inviteCode, memberIds, memberNames, createdAt
+    }
+}
+
+extension Fridge {
+    /// "My fridge" when it's just me, otherwise the roommates' names.
+    func displayName(for uid: String) -> String {
+        let others = memberIds.filter { $0 != uid }.map { memberNames[$0] ?? "Roommate" }
+        guard !others.isEmpty else { return "My fridge" }
+        let shown = others.prefix(3).joined(separator: ", ")
+        return others.count > 3 ? "With \(shown) +\(others.count - 3)" : "With \(shown)"
     }
 }
 
@@ -190,7 +214,43 @@ struct Recipe: Identifiable, Codable, Hashable {
         minutes = Int(c.lenientDouble(.minutes) ?? 15)
         servings = Int(c.lenientDouble(.servings) ?? 2)
         ingredients = (try? c.decode([RecipeIngredient].self, forKey: .ingredients)) ?? []
-        steps = (try? c.decode([String].self, forKey: .steps)) ?? []
+        // The AI sometimes returns steps as objects or one long string. If steps came back empty,
+        // "Start Cooking" was disabled and looked unclickable.
+        if let list = try? c.decode([String].self, forKey: .steps) {
+            steps = list
+        } else if let objects = try? c.decode([RecipeStepObject].self, forKey: .steps) {
+            steps = objects.compactMap(\.text)
+        } else if let text = try? c.decode(String.self, forKey: .steps) {
+            steps = text.split(separator: "\n").map { String($0) }
+        } else {
+            steps = []
+        }
+        steps = steps
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+}
+
+/// One step written as {"text": "..."} / {"instruction": "..."} etc.
+private struct RecipeStepObject: Decodable {
+    let text: String?
+
+    private struct AnyKey: CodingKey {
+        var stringValue: String
+        var intValue: Int? { nil }
+        init?(stringValue: String) { self.stringValue = stringValue }
+        init?(intValue: Int) { nil }
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: AnyKey.self)
+        for name in ["text", "instruction", "description", "content", "step"] {
+            if let key = AnyKey(stringValue: name), let value = try? c.decode(String.self, forKey: key), !value.isEmpty {
+                text = value
+                return
+            }
+        }
+        text = nil
     }
 }
 

@@ -6,6 +6,9 @@ struct ProfileSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""
     @State private var confirmLeave = false
+    @State private var joinCode = ""
+    @State private var busy = false
+    @State private var fridgeError: String?
 
     var body: some View {
         ScrollView {
@@ -61,6 +64,8 @@ struct ProfileSheet: View {
                     }
                 }
 
+                fridgesSection
+
                 Button("Leave this fridge") { confirmLeave = true }
                     .font(AppFont.rounded(13, .black))
                     .foregroundStyle(Palette.danger)
@@ -72,13 +77,97 @@ struct ProfileSheet: View {
         }
         .background(LinearGradient(colors: [Color(hex: 0xDFF1E9), Palette.cream], startPoint: .top, endPoint: .bottom).ignoresSafeArea())
         .onAppear { name = store.userName }
+        .task { await store.loadMyFridges() }
+        .disabled(busy)
         .confirmationDialog("Leave this fridge?", isPresented: $confirmLeave, titleVisibility: .visible) {
             Button("Leave", role: .destructive) {
                 dismiss()
                 Task { await store.leaveFridge() }
             }
         } message: {
-            Text("Your food stays with your roommates. You can join again with the invite code.")
+            Text(store.fridgeIds.count > 1
+                 ? "Your food in this fridge stays with your roommates. You'll switch to your other fridge."
+                 : "This is your only fridge. You'll need to start or join a fridge again afterwards.")
+        }
+    }
+
+    // MARK: Fridges
+
+    /// Every fridge I belong to: switch between them, join another, or start a new one.
+    /// Joining no longer replaces the fridge you already have.
+    private var fridgesSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            FieldLabel(text: "Your fridges")
+            ForEach(store.myFridges, id: \.id) { item in
+                let isCurrent = item.id == store.currentFridgeId
+                Button {
+                    guard !isCurrent else { return }
+                    Task { await store.switchFridge(to: item.id) }
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "refrigerator")
+                            .font(.system(size: 15, weight: .semibold))
+                            .frame(width: 30, height: 30)
+                            .background(Circle().fill(Palette.fridgeBlue))
+                        Text(item.displayName(for: store.uid))
+                            .font(AppFont.rounded(14, .heavy))
+                            .lineLimit(1)
+                        Spacer()
+                        if isCurrent {
+                            Text("Open").font(AppFont.rounded(11, .black)).foregroundStyle(Palette.activeGreen)
+                        }
+                    }
+                    .foregroundStyle(Palette.ink)
+                    .padding(.horizontal, 10)
+                    .frame(minHeight: 46)
+                    .background(RoundedRectangle(cornerRadius: 12).fill(isCurrent ? Palette.mint : .white))
+                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(isCurrent ? Color(hex: 0x3D896D) : Palette.lightBorder, lineWidth: 1.5))
+                }
+                .buttonStyle(.plain)
+            }
+
+            HStack(spacing: 8) {
+                TextField("Invite code", text: $joinCode)
+                    .textInputAutocapitalization(.characters)
+                    .autocorrectionDisabled()
+                    .fieldStyle()
+                Button("Join") { join() }
+                    .buttonStyle(SecondaryButtonStyle(fill: Palette.mint))
+                    .frame(width: 90)
+                    .disabled(joinCode.trimmingCharacters(in: .whitespaces).count < 6)
+            }
+            .padding(.top, 4)
+
+            Button {
+                run { try await store.createFridge(name: store.userName) }
+            } label: {
+                Label("Start a new fridge", systemImage: "plus")
+            }
+            .buttonStyle(SecondaryButtonStyle())
+
+            if let fridgeError {
+                Text(fridgeError)
+                    .font(AppFont.rounded(12, .bold))
+                    .foregroundStyle(Palette.danger)
+            }
+        }
+    }
+
+    private func join() {
+        let code = joinCode
+        run {
+            try await store.joinFridge(name: store.userName, code: code)
+            joinCode = ""
+        }
+    }
+
+    private func run(_ work: @escaping () async throws -> Void) {
+        fridgeError = nil
+        busy = true
+        Task {
+            do { try await work() } catch { fridgeError = AppStore.friendly(error) }
+            await store.loadMyFridges()
+            busy = false
         }
     }
 

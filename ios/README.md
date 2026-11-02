@@ -84,7 +84,7 @@ open Fridge2Gether.xcodeproj
 ## 数据结构（Firestore）
 
 ```
-users/{uid}                  name, fridgeId
+users/{uid}                  name, fridgeId (当前打开的冰箱), fridgeIds[] (加入的所有冰箱)
 fridges/{fridgeId}           inviteCode, memberIds[], memberNames{uid:name}
   foods/{foodId}             name, imageData(base64), expiry, amount, fullAmount, unit,
                              ownerId, ownerName, sharing(justMe|everyone|selected), sharedWith[]

@@ -39,8 +39,9 @@ enum DeepSeekService {
     }
 
     static func scanGroceries(_ image: UIImage) async throws -> [ScannedItem] {
-        let small = ImageProcessor.resized(image, maxSide: 1024)
-        guard let jpeg = small.jpegData(compressionQuality: 0.8) else {
+        // A smaller upload means fewer image tokens and a faster answer. 768px is still plenty to read labels.
+        let small = ImageProcessor.resized(image, maxSide: 768)
+        guard let jpeg = small.jpegData(compressionQuality: 0.7) else {
             throw AppError.message("Could not read the photo.")
         }
         let prompt = """

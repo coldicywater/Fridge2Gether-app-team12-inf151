@@ -156,10 +156,20 @@ struct ScanFlowView: View {
         Task {
             let today = Calendar.current.startOfDay(for: Date())
             do {
-                let scanned = try await DeepSeekService.scanGroceries(upright)
+                let scanned = try await Array(DeepSeekService.scanGroceries(upright).prefix(8))
+                // Cut out all stickers at the same time instead of one after another.
+                let stickers: [UIImage] = await withTaskGroup(of: (Int, UIImage).self) { group in
+                    for (index, item) in scanned.enumerated() {
+                        let box = item.box
+                        group.addTask { (index, await ImageProcessor.makeSticker(from: upright, box: box)) }
+                    }
+                    var output = [UIImage?](repeating: nil, count: scanned.count)
+                    for await (index, image) in group { output[index] = image }
+                    return output.map { $0 ?? upright }
+                }
                 var results: [DetectedItem] = []
-                for item in scanned.prefix(8) {
-                    let sticker = await ImageProcessor.makeSticker(from: upright, box: item.box)
+                for (index, item) in scanned.enumerated() {
+                    let sticker = stickers[index]
                     let days = max(item.shelfLifeDays ?? 5, 0)
                     let quantity = item.quantity.map { Food.format($0) } ?? "1"
                     results.append(DetectedItem(

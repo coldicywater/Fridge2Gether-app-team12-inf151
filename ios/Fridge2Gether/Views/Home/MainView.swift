@@ -16,7 +16,8 @@ struct MainView: View {
                 switch tab {
                 case .fridge:
                     NavigationStack(path: $fridgePath) {
-                        HomeView(onFood: open, onProfile: { showProfile = true }, onCategory: { fridgePath.append($0) })
+                        HomeView(onFood: open, onProfile: { showProfile = true }, onCategory: { fridgePath.append($0) },
+                                 onScan: { scanning = true })
                             .navigationDestination(for: FridgeCategory.self) { category in
                                 CategoryView(category: category, onFood: open)
                             }
@@ -30,7 +31,7 @@ struct MainView: View {
                     }
                 }
             }
-            .safeAreaInset(edge: .bottom) { Color.clear.frame(height: showsNav ? 96 : 0) }
+            .safeAreaInset(edge: .bottom) { Color.clear.frame(height: showsNav ? BottomNav.reservedHeight : 0) }
 
             if showsNav {
                 BottomNav(tab: $tab, onScan: { scanning = true })
@@ -59,16 +60,13 @@ struct MainView: View {
             ProfileSheet()
                 .presentationDetents([.medium, .large])
         }
+        .storeErrorAlert()
     }
 
     /// Cooking mode and the post-cooking update hide the nav, like in the prototype.
+    /// The recipe detail hides it too: the floating nav sat on top of "Start Cooking" and ate the taps.
     private var showsNav: Bool {
-        if tab == .recipes, let last = recipesPath.last {
-            switch last {
-            case .cooking, .update: return false
-            case .detail: return true
-            }
-        }
+        if tab == .recipes, !recipesPath.isEmpty { return false }
         return true
     }
 
@@ -91,6 +89,7 @@ struct HomeView: View {
     let onFood: (Food) -> Void
     let onProfile: () -> Void
     let onCategory: (FridgeCategory) -> Void
+    let onScan: () -> Void
 
     private var greeting: String {
         let hour = Calendar.current.component(.hour, from: Date())
@@ -111,17 +110,23 @@ struct HomeView: View {
                 }
 
                 if store.visibleFoods.isEmpty {
-                    HStack(spacing: 9) {
-                        Image(systemName: "camera")
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text("Your fridge is empty!").font(AppFont.rounded(13, .black)).foregroundStyle(Palette.ink)
-                            Text("Scan your first groceries to get started.").font(AppFont.rounded(12, .semibold))
+                    // Tapping the box opens the camera.
+                    Button(action: onScan) {
+                        HStack(spacing: 9) {
+                            Image(systemName: "camera")
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text("Your fridge is empty!").font(AppFont.rounded(13, .black)).foregroundStyle(Palette.ink)
+                                Text("Scan your first groceries to get started.").font(AppFont.rounded(12, .semibold))
+                            }
                         }
+                        .foregroundStyle(Color(hex: 0x58716B))
+                        .frame(maxWidth: .infinity, minHeight: 58)
+                        .background(RoundedRectangle(cornerRadius: 17).fill(Color.white.opacity(0.5)))
+                        .overlay(RoundedRectangle(cornerRadius: 17).stroke(Color(hex: 0x85A49A), style: StrokeStyle(lineWidth: 1.5, dash: [5, 4])))
+                        .contentShape(RoundedRectangle(cornerRadius: 17))
                     }
-                    .foregroundStyle(Color(hex: 0x58716B))
-                    .frame(maxWidth: .infinity, minHeight: 58)
-                    .background(RoundedRectangle(cornerRadius: 17).fill(Color.white.opacity(0.5)))
-                    .overlay(RoundedRectangle(cornerRadius: 17).stroke(Color(hex: 0x85A49A), style: StrokeStyle(lineWidth: 1.5, dash: [5, 4])))
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Take a photo of your groceries")
                 } else if !store.expiringFoods.isEmpty {
                     ExpiringWarning(count: store.expiringFoods.count) { onCategory(.expiring) }
                 }
@@ -305,4 +310,29 @@ struct CategoryView: View {
         .frame(minHeight: 83)
         .cartoonCard(radius: 17, shadow: 2)
     }
+}
+
+// MARK: - Save errors
+
+/// Shows `store.lastError` (a failed save) as an alert.
+struct StoreErrorAlert: ViewModifier {
+    @Environment(AppStore.self) private var store
+
+    func body(content: Content) -> some View {
+        content.alert(
+            "Couldn't save that",
+            isPresented: Binding(
+                get: { store.lastError != nil },
+                set: { if !$0 { store.lastError = nil } }
+            )
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(store.lastError ?? "")
+        }
+    }
+}
+
+extension View {
+    func storeErrorAlert() -> some View { modifier(StoreErrorAlert()) }
 }

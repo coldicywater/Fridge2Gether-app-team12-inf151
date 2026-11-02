@@ -181,9 +181,21 @@ struct BottomNav: View {
     @Binding var tab: MainTab
     let onScan: () -> Void
 
+    /// Space screens leave at the bottom so nothing scrolls under the nav.
+    /// Nav is 76 tall + 4 padding, and the camera button sticks up about 27 more, plus a little room.
+    static let reservedHeight: CGFloat = 116
+
     var body: some View {
         HStack(spacing: 0) {
             navButton(.fridge, icon: "refrigerator", title: "Fridge")
+            Color.clear.frame(width: 84)
+            navButton(.recipes, icon: "frying.pan", title: "Recipes")
+        }
+        .frame(height: 76)
+        .cartoonCard(fill: Color(hex: 0xFFFDF8), radius: 24, shadow: 4)
+        // The camera button is drawn after the card, so the card's outline no longer
+        // cuts a line across it.
+        .overlay {
             Button(action: onScan) {
                 Image(systemName: "camera")
                     .font(.system(size: 26, weight: .semibold))
@@ -195,11 +207,7 @@ struct BottomNav: View {
             }
             .accessibilityLabel("Scan groceries")
             .offset(y: -30)
-            .frame(width: 84)
-            navButton(.recipes, icon: "frying.pan", title: "Recipes")
         }
-        .frame(height: 76)
-        .cartoonCard(fill: Color(hex: 0xFFFDF8), radius: 24, shadow: 4)
         .padding(.horizontal, 13)
     }
 
