@@ -10,9 +10,10 @@ struct FridgeView: View {
     var body: some View {
         VStack(spacing: 7) {
             let hasRoommates = !store.roommates.isEmpty
+            // Living alone: one tall shelf with food in rows of 3, like a real fridge.
             zone(.personal, subtitle: "just yours", foods: store.personalFoods,
-                 fill: Palette.shelfWhite, titleColor: Palette.ink)
-                .frame(height: hasRoommates ? 165 : 210)
+                 fill: Palette.shelfWhite, titleColor: Palette.ink, tall: !hasRoommates)
+                .frame(height: hasRoommates ? 165 : 440)
             if hasRoommates {
                 zone(.shared, subtitle: "roommates can use", foods: store.sharedFoods,
                      fill: Palette.sharedGreen, titleColor: Palette.sharedText)
@@ -50,8 +51,19 @@ struct FridgeView: View {
             .frame(width: 36, height: 14)
     }
 
+    private func sticker(_ food: Food) -> some View {
+        Button { onFood(food) } label: {
+            StickerView(
+                food: food,
+                highlighted: store.highlightedFoodIds.contains(food.id),
+                badge: food.ownerId != store.uid ? food.ownerName : nil
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
     private func zone(_ category: FridgeCategory, subtitle: String, foods: [Food], fill: Color, titleColor: Color,
-                      border: Color = Palette.ink, inset: Color? = nil) -> some View {
+                      border: Color = Palette.ink, inset: Color? = nil, tall: Bool = false) -> some View {
         ZStack(alignment: .top) {
             RoundedRectangle(cornerRadius: 15).fill(fill)
             if let inset {
@@ -79,26 +91,36 @@ struct FridgeView: View {
                 .padding(.horizontal, 10)
                 .padding(.top, 6)
 
-                Spacer(minLength: 0)
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(alignment: .bottom, spacing: 5) {
-                        ForEach(foods) { food in
-                            Button { onFood(food) } label: {
-                                StickerView(
-                                    food: food,
-                                    highlighted: store.highlightedFoodIds.contains(food.id),
-                                    badge: food.ownerId != store.uid ? food.ownerName : nil
-                                )
-                            }
-                            .buttonStyle(.plain)
+                if tall {
+                    ScrollView(.vertical, showsIndicators: false) {
+                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 3), spacing: 12) {
+                            ForEach(foods) { food in sticker(food) }
                         }
+                        .padding(.horizontal, 6)
+                        .padding(.top, 10)
+                        .padding(.bottom, 16)
                     }
-                    .padding(.horizontal, 8)
-                    .padding(.bottom, 11)
+                    .padding(.bottom, 7)
+                } else {
+                    Spacer(minLength: 0)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(alignment: .bottom, spacing: 5) {
+                            ForEach(foods) { food in sticker(food) }
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.bottom, 11)
+                    }
                 }
             }
         }
         .overlay(RoundedRectangle(cornerRadius: 15).stroke(border, lineWidth: 3))
+        .overlay {
+            if tall && foods.isEmpty {
+                Text("Nothing here yet")
+                    .font(AppFont.hand(18))
+                    .foregroundStyle(Palette.muted)
+            }
+        }
         .contentShape(RoundedRectangle(cornerRadius: 15))
         .onTapGesture { onCategory(category) }
         .accessibilityElement(children: .contain)
