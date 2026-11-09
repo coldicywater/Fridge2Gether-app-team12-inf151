@@ -70,10 +70,10 @@ struct Food: Identifiable, Codable, Hashable {
 
     var dateLabel: String { expiry.formatted(.dateTime.month(.abbreviated).day()) }
 
-    var quantityLabel: String { Food.quantityLabel(amount, unit) }
+    var quantityLabel: String { Food.amountLabel(amount, unit) }
 
     /// "2 apples", "1 apple", "1 plate". The unit turns singular when there's exactly one.
-    static func quantityLabel(_ amount: Double, _ unit: String) -> String {
+    static func amountLabel(_ amount: Double, _ unit: String) -> String {
         let trimmed = unit.trimmingCharacters(in: .whitespaces)
         let shown = amount == 1 ? singular(trimmed) : trimmed
         return shown.isEmpty ? format(amount) : "\(format(amount)) \(shown)"

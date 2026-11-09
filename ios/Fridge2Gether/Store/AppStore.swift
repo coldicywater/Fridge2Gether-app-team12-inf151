@@ -283,7 +283,7 @@ final class AppStore {
                     message.id = doc.documentID
                     return message
                 }
-                Task { @MainActor in self?.messages = items.reversed() }
+                Task { @MainActor in self?.messages = Array(items.reversed()) }
             }
         loadChatLastRead(fridgeId)
         listeners = [fridgeListener, foodsListener, offersListener, messagesListener]

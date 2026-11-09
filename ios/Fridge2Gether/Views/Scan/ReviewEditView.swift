@@ -219,7 +219,7 @@ struct QuantityEditor: View {
             HStack {
                 FieldLabel(text: "Quantity")
                 Spacer()
-                Text(Food.quantityLabel(amount, unit))
+                Text(Food.amountLabel(amount, unit))
                     .font(AppFont.rounded(11, .black))
                     .foregroundStyle(Palette.sharedText)
             }

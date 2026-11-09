@@ -312,7 +312,7 @@ struct UpdateIngredientsView: View {
             for (food, amount) in updates {
                 await store.setAmount(food, amount: amount, announce: false)
             }
-            store.postCooked(cooked, used: updates.map(\.0))
+            store.postCooked(cooked, used: updates.map { $0.0 })
             saving = false
             onGoHome()
         }
