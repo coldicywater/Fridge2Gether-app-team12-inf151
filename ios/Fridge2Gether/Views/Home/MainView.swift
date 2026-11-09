@@ -51,7 +51,6 @@ struct MainView: View {
                 tab = .recipes
                 Task { await store.refreshRecipes() }
             })
-            .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
             .presentationCornerRadius(30)
         }

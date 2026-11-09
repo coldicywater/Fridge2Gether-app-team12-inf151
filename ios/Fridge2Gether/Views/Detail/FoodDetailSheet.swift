@@ -16,6 +16,8 @@ struct FoodDetailSheet: View {
     @State private var selected: Set<String> = []
     @State private var expiryDraft = Date()
     @State private var loaded = false
+    /// Opens to half height; editing a date or amount needs the full sheet so the panel isn't cut off.
+    @State private var detent: PresentationDetent = .medium
 
     var body: some View {
         Group {
@@ -27,6 +29,10 @@ struct FoodDetailSheet: View {
             }
         }
         .background(Palette.card.ignoresSafeArea())
+        .presentationDetents([.medium, .large], selection: $detent)
+        .onChange(of: panel) {
+            if panel != .main { withAnimation { detent = .large } }
+        }
         // The sheet covers MainView, so failed saves have to be shown here too.
         .storeErrorAlert()
     }
@@ -48,17 +54,24 @@ struct FoodDetailSheet: View {
                             .padding(.vertical, 3)
                             .background(Capsule().fill(pillColor(food.freshness)))
                         Text(food.name).font(AppFont.rounded(25, .black))
-                        Text("Best before \(food.dateLabel)")
+                        Button { editExpiry(food) } label: {
+                            HStack(spacing: 4) {
+                                Text("Best before \(food.dateLabel)")
+                                Image(systemName: "pencil").font(.system(size: 11, weight: .bold))
+                            }
                             .font(AppFont.rounded(13, .semibold))
                             .foregroundStyle(Color(hex: 0x6C7D78))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Edit expiry date")
                     }
                 }
                 .padding(.top, 24)
 
                 // Facts grid
                 LazyVGrid(columns: [GridItem(.flexible(), spacing: 7), GridItem(.flexible())], spacing: 7) {
-                    fact("Quantity", food.quantityLabel)
-                    fact("Expires", "\(food.dateLabel) · \(food.daysLabel)")
+                    fact("Quantity", food.quantityLabel, editable: true) { panel = .quantity }
+                    fact("Expires", "\(food.dateLabel) · \(food.daysLabel)", editable: true) { editExpiry(food) }
                     fact("Owner", isMine ? "\(store.userName) (you)" : food.ownerName)
                     fact("Sharing", sharingLabel(food, isMine: isMine))
                 }
@@ -124,8 +137,7 @@ struct FoodDetailSheet: View {
                 shareButton(title: "Change sharing") { panel = .share }
             }
             Button {
-                expiryDraft = food.expiry
-                panel = .expiry
+                editExpiry(food)
             } label: {
                 Label("Edit expiry date", systemImage: "calendar")
             }
@@ -288,18 +300,39 @@ struct FoodDetailSheet: View {
         .buttonStyle(.plain)
     }
 
-    private func fact(_ label: String, _ value: String) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(label.uppercased())
-                .font(AppFont.rounded(9, .black))
-                .tracking(0.8)
-                .foregroundStyle(Color(hex: 0x76857F))
-            Text(value).font(AppFont.rounded(14, .heavy)).lineLimit(2)
+    private func editExpiry(_ food: Food) {
+        expiryDraft = food.expiry
+        panel = .expiry
+    }
+
+    /// Fact box. Editable ones show a pencil and open their edit panel when tapped.
+    private func fact(_ label: String, _ value: String, editable: Bool = false, onEdit: (() -> Void)? = nil) -> some View {
+        Button { onEdit?() } label: {
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 4) {
+                    Text(label.uppercased())
+                        .font(AppFont.rounded(9, .black))
+                        .tracking(0.8)
+                        .foregroundStyle(Color(hex: 0x76857F))
+                    if editable {
+                        Spacer(minLength: 0)
+                        Image(systemName: "pencil")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(Palette.sharedText)
+                    }
+                }
+                Text(value).font(AppFont.rounded(14, .heavy)).lineLimit(2)
+            }
+            .foregroundStyle(Palette.ink)
+            .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(RoundedRectangle(cornerRadius: 13).fill(editable ? Color(hex: 0xF3FAF6) : .clear))
+            .overlay(RoundedRectangle(cornerRadius: 13).stroke(editable ? Color(hex: 0x9CC9B2) : Color(hex: 0xD4D9D4), lineWidth: 1.5))
+            .contentShape(RoundedRectangle(cornerRadius: 13))
         }
-        .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .overlay(RoundedRectangle(cornerRadius: 13).stroke(Color(hex: 0xD4D9D4), lineWidth: 1.5))
+        .buttonStyle(.plain)
+        .disabled(!editable)
     }
 
     private func sharingLabel(_ food: Food, isMine: Bool) -> String {
