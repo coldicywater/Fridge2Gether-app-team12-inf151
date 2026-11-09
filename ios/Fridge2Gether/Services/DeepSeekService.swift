@@ -48,10 +48,15 @@ enum DeepSeekService {
         You are the grocery scanner inside a fridge app. Look at the photo and list each distinct food item \
         (at most 8). Group identical items into one entry with a count.
         Reply with JSON only, in this shape:
-        {"items":[{"name":"Avocado","quantity":2,"unit":"pieces","shelfLifeDays":4,"box":[0.1,0.2,0.3,0.25]}]}
+        {"items":[{"name":"Avocado","quantity":2,"unit":"avocados","shelfLifeDays":4,"box":[0.1,0.2,0.3,0.25]}]}
         Rules:
         - name: short English name a person would write on a label, Title case.
-        - quantity + unit: your best guess, e.g. 2 pieces, 500 ml, 1 bag, 1 carton.
+        - quantity + unit: count what you see and use the word a person would say.
+          - Loose whole items: the food's own plural noun, lowercase: 2 apples, 6 eggs, 3 bananas.
+          - Cooked food or leftovers: the dish it's in: 2 plates, 1 bowl, 1 box.
+          - Packaged items: the package: 1 carton, 2 bottles, 3 cans, 1 bag.
+          - Use g, ml, kg or L only when the label shows the weight or volume.
+          - Avoid "pieces" unless nothing else fits.
         - shelfLifeDays: how many days from today it stays good in a home fridge.
         - box: bounding box of the item as [x, y, width, height], each between 0 and 1, origin top-left.
         - If you see no food, return {"items":[]}.
@@ -71,7 +76,8 @@ enum DeepSeekService {
         var recipes: [Recipe]
     }
 
-    static func recipes(for foods: [Food]) async throws -> [Recipe] {
+    /// `mustUse`: ingredients the user picked to cook with today. Every recipe uses all of them.
+    static func recipes(for foods: [Food], mustUse: [Food] = []) async throws -> [Recipe] {
         let inventory: [[String: Any]] = foods.map { food in
             [
                 "foodId": food.id,
@@ -85,12 +91,24 @@ enum DeepSeekService {
             encoding: .utf8
         ) ?? "[]"
 
+        let focus: String
+        if mustUse.isEmpty {
+            focus = "Suggest 3 simple recipes. Put recipes that use items with the smallest daysLeft first."
+        } else {
+            let picked = mustUse.map { "\($0.name) (foodId \($0.id))" }.joined(separator: ", ")
+            focus = """
+            The user wants to cook with these today: \(picked).
+            Suggest 3 different simple recipes. Every recipe must use ALL of these items. \
+            Other fridge items are optional; only add them if they fit well.
+            """
+        }
+
         let prompt = """
         You suggest home recipes for roommates who share a fridge and want to waste less food.
         Fridge inventory (daysLeft = days until it expires):
         \(inventoryJSON)
 
-        Suggest 3 simple recipes. Put recipes that use items with the smallest daysLeft first.
+        \(focus)
         Each recipe may add 1 or 2 common pantry items that are not in the fridge.
         Reply with JSON only, in this shape:
         {"recipes":[{"name":"Creamy avocado toast","emoji":"🥑","minutes":12,"servings":2,

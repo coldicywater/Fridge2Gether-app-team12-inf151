@@ -70,7 +70,23 @@ struct Food: Identifiable, Codable, Hashable {
 
     var dateLabel: String { expiry.formatted(.dateTime.month(.abbreviated).day()) }
 
-    var quantityLabel: String { "\(Food.format(amount)) \(unit)" }
+    var quantityLabel: String { Food.quantityLabel(amount, unit) }
+
+    /// "2 apples", "1 apple", "1 plate". The unit turns singular when there's exactly one.
+    static func quantityLabel(_ amount: Double, _ unit: String) -> String {
+        let trimmed = unit.trimmingCharacters(in: .whitespaces)
+        let shown = amount == 1 ? singular(trimmed) : trimmed
+        return shown.isEmpty ? format(amount) : "\(format(amount)) \(shown)"
+    }
+
+    /// apples → apple, berries → berry, boxes → box, glasses → glass. Leaves "g", "ml", "fish" alone.
+    static func singular(_ word: String) -> String {
+        let lower = word.lowercased()
+        guard lower.count > 2, lower.hasSuffix("s"), !lower.hasSuffix("ss") else { return word }
+        if lower.hasSuffix("ies") && lower.count > 4 { return String(word.dropLast(3)) + "y" }
+        if ["oes", "xes", "ches", "shes", "sses"].contains(where: { lower.hasSuffix($0) }) { return String(word.dropLast(2)) }
+        return String(word.dropLast())
+    }
 
     /// Decoded once and cached. Decoding base64 on every render made the Recipes page lag.
     var image: UIImage? {
@@ -260,21 +276,24 @@ struct DetectedItem: Identifiable {
     let id = UUID()
     var name: String
     var expiry: Date
-    var quantityText: String
+    /// How many, e.g. 2
+    var amount: Double
+    /// The counting word, e.g. "apples", "plates", "bottles", "g"
+    var unit: String
     var sharing: Sharing = .justMe
     var sharedWith: [String] = []
     var sticker: UIImage?
 
-    /// "2 pieces" -> (2, "pieces"); "Half" -> (1, "Half")
+    /// What gets saved. The unit is stored in its plural form ("apples"), so the label
+    /// still reads right after some are used ("1 apple" → shown singular automatically).
     var parsedQuantity: (amount: Double, unit: String) {
-        let trimmed = quantityText.trimmingCharacters(in: .whitespaces)
-        let scanner = Scanner(string: trimmed)
-        if let number = scanner.scanDouble() {
-            let rest = String(scanner.string[scanner.currentIndex...]).trimmingCharacters(in: .whitespaces)
-            return (max(number, 0), rest.isEmpty ? "pcs" : rest)
-        }
-        return (1, trimmed.isEmpty ? "pcs" : trimmed)
+        let trimmed = unit.trimmingCharacters(in: .whitespaces)
+        return (amount > 0 ? amount : 1, trimmed.isEmpty ? "pieces" : trimmed)
     }
+
+    /// Counting words offered in the Quantity menu. The AI's own word (e.g. "apples") is added on top.
+    static let commonUnits = ["pieces", "plates", "bowls", "boxes", "bottles", "cans", "cartons",
+                              "bags", "slices", "g", "kg", "ml", "L", "lb", "oz"]
 }
 
 // MARK: - Chat (one group per fridge)

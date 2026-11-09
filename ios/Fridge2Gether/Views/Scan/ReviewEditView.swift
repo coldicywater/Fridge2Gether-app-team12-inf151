@@ -117,7 +117,7 @@ struct ReviewEditView: View {
     /// Looks items up by id so a removed item can never index out of range.
     private func binding(for id: UUID) -> Binding<DetectedItem> {
         Binding(
-            get: { items.first { $0.id == id } ?? DetectedItem(name: "", expiry: Date(), quantityText: "") },
+            get: { items.first { $0.id == id } ?? DetectedItem(name: "", expiry: Date(), amount: 1, unit: "pieces") },
             set: { newValue in
                 if let i = items.firstIndex(where: { $0.id == id }) { items[i] = newValue }
             }
@@ -132,24 +132,18 @@ struct ReviewEditView: View {
                     .textInputAutocapitalization(.words)
                     .fieldStyle()
             }
-            HStack(alignment: .top, spacing: 10) {
-                VStack(alignment: .leading, spacing: 5) {
-                    FieldLabel(text: "Estimated expiry")
-                    DatePicker("", selection: item.expiry, displayedComponents: .date)
-                        .labelsHidden()
-                        .tint(Palette.green)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 6)
-                        .frame(height: 48)
-                        .background(RoundedRectangle(cornerRadius: 13).fill(Color(hex: 0xFFFDF9)))
-                        .overlay(RoundedRectangle(cornerRadius: 13).stroke(Palette.ink, lineWidth: 2))
-                }
-                VStack(alignment: .leading, spacing: 5) {
-                    FieldLabel(text: "Quantity")
-                    TextField("2 pieces", text: item.quantityText)
-                        .fieldStyle()
-                }
+            VStack(alignment: .leading, spacing: 5) {
+                FieldLabel(text: "Estimated expiry")
+                DatePicker("", selection: item.expiry, displayedComponents: .date)
+                    .labelsHidden()
+                    .tint(Palette.green)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 6)
+                    .frame(height: 48)
+                    .background(RoundedRectangle(cornerRadius: 13).fill(Color(hex: 0xFFFDF9)))
+                    .overlay(RoundedRectangle(cornerRadius: 13).stroke(Palette.ink, lineWidth: 2))
             }
+            QuantityEditor(amount: item.amount, unit: item.unit)
 
             VStack(alignment: .leading, spacing: 6) {
                 FieldLabel(text: "Sharing")
@@ -203,5 +197,84 @@ struct ReviewEditView: View {
                 errorText = AppStore.friendly(error)
             }
         }
+    }
+}
+
+/// Quantity as a number with − / + and a counting word ("2 apples", "1 plate").
+/// The word can be typed or picked from the menu.
+struct QuantityEditor: View {
+    @Binding var amount: Double
+    @Binding var unit: String
+    /// The word the AI picked, kept at the top of the menu after the user changes it.
+    @State private var original: String?
+
+    private var units: [String] {
+        var list = DetectedItem.commonUnits
+        if let original, !original.isEmpty, !list.contains(original) { list.insert(original, at: 0) }
+        return list
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack {
+                FieldLabel(text: "Quantity")
+                Spacer()
+                Text(Food.quantityLabel(amount, unit))
+                    .font(AppFont.rounded(11, .black))
+                    .foregroundStyle(Palette.sharedText)
+            }
+            HStack(spacing: 8) {
+                HStack(spacing: 0) {
+                    stepButton("minus") { amount = max(amount - 1, 0) }
+                        .disabled(amount < 1)
+                    TextField("1", value: $amount, format: .number.precision(.fractionLength(0...2)))
+                        .keyboardType(.decimalPad)
+                        .multilineTextAlignment(.center)
+                        .font(AppFont.rounded(16, .black))
+                        .frame(width: 46)
+                    stepButton("plus") { amount = (amount + 1).rounded(.down) }
+                }
+                .frame(height: 48)
+                .background(RoundedRectangle(cornerRadius: 13).fill(Color(hex: 0xFFFDF9)))
+                .overlay(RoundedRectangle(cornerRadius: 13).stroke(Palette.ink, lineWidth: 2))
+
+                HStack(spacing: 4) {
+                    TextField("apples", text: $unit)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .font(AppFont.rounded(15, .heavy))
+                    Menu {
+                        ForEach(units, id: \.self) { option in
+                            Button(option) { unit = option }
+                        }
+                    } label: {
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(Palette.ink)
+                            .frame(width: 30, height: 40)
+                            .contentShape(Rectangle())
+                    }
+                    .accessibilityLabel("Pick a unit")
+                }
+                .padding(.leading, 13)
+                .padding(.trailing, 4)
+                .frame(maxWidth: .infinity, minHeight: 48)
+                .background(RoundedRectangle(cornerRadius: 13).fill(Color(hex: 0xFFFDF9)))
+                .overlay(RoundedRectangle(cornerRadius: 13).stroke(Palette.ink, lineWidth: 2))
+            }
+        }
+        .foregroundStyle(Palette.ink)
+        .onAppear { if original == nil { original = unit } }
+    }
+
+    private func stepButton(_ icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .black))
+                .frame(width: 40, height: 48)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(icon == "plus" ? "One more" : "One less")
     }
 }

@@ -36,6 +36,10 @@ final class AppStore {
     var recipes: [Recipe] = []
     var recipesLoading = false
     var recipesError: String?
+    /// Ingredients ticked on the Recipes page.
+    var recipeSelection: Set<String> = []
+    /// Ingredients the current recipes were made around. Empty means "anything in the fridge".
+    var recipesFocus: [String] = []
     private var recipesInventoryKey = ""
 
     /// Food ids that were just shared with me; they glow on the fridge until opened.
@@ -293,6 +297,8 @@ final class AppStore {
         offers = []
         messages = []
         recipes = []
+        recipeSelection = []
+        recipesFocus = []
         recipesInventoryKey = ""
         highlightedFoodIds = []
     }
@@ -308,11 +314,18 @@ final class AppStore {
 
     var visibleFoods: [Food] { foods.filter { $0.isVisible(to: uid) } }
 
-    /// Fresh, mine, not shared.
-    var personalFoods: [Food] { visibleFoods.filter { $0.freshness == .fresh && $0.ownerId == uid && !$0.isShared } }
+    /// Mine and not shared, expiring or not (the ring color shows how fresh it is).
+    /// Living alone there is no Shared shelf, so everything goes here.
+    var personalFoods: [Food] {
+        guard !roommates.isEmpty else { return visibleFoods }
+        return visibleFoods.filter { $0.ownerId == uid && !$0.isShared }
+    }
 
-    /// Fresh and shared (by me, or with me).
-    var sharedFoods: [Food] { visibleFoods.filter { $0.freshness == .fresh && $0.isShared } }
+    /// Shared by me or with me, expiring or not. Only shown when the fridge has roommates.
+    var sharedFoods: [Food] {
+        guard !roommates.isEmpty else { return [] }
+        return visibleFoods.filter { $0.isShared }
+    }
 
     /// Anything expiring within 3 days that I can see.
     var expiringFoods: [Food] { visibleFoods.filter { $0.freshness != .fresh } }
@@ -613,14 +626,29 @@ final class AppStore {
         await refreshRecipes()
     }
 
+    /// "Make recipes with these": every recipe uses all the picked ingredients.
+    func makeRecipes(with ids: [String]) async {
+        recipesFocus = ids
+        await refreshRecipes()
+    }
+
+    /// Back to ideas from the whole fridge.
+    func clearRecipeFocus() async {
+        recipeSelection = []
+        recipesFocus = []
+        await refreshRecipes()
+    }
+
     func refreshRecipes() async {
         guard !recipesLoading else { return }
         recipesLoading = true
         recipesError = nil
         recipesInventoryKey = inventoryKey
         let inventory = visibleFoods
+        recipesFocus = recipesFocus.filter { id in inventory.contains { $0.id == id } }
+        let mustUse = recipesFocus.compactMap { id in inventory.first { $0.id == id } }
         do {
-            let result = try await DeepSeekService.recipes(for: inventory)
+            let result = try await DeepSeekService.recipes(for: inventory, mustUse: mustUse)
             let validIds = Set(inventory.map(\.id))
             recipes = result.map { recipe in
                 var copy = recipe

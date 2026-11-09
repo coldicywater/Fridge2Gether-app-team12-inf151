@@ -191,11 +191,12 @@ struct ScanFlowView: View {
                 for (index, item) in scanned.enumerated() {
                     let sticker = stickers[index]
                     let days = max(item.shelfLifeDays ?? 5, 0)
-                    let quantity = item.quantity.map { Food.format($0) } ?? "1"
+                    let unit = item.unit?.trimmingCharacters(in: .whitespaces) ?? ""
                     results.append(DetectedItem(
                         name: item.name,
                         expiry: Calendar.current.date(byAdding: .day, value: days, to: today) ?? today,
-                        quantityText: "\(quantity) \(item.unit ?? "pcs")",
+                        amount: max(item.quantity ?? 1, 0),
+                        unit: unit.isEmpty ? "pieces" : unit,
                         sticker: sticker
                     ))
                 }
@@ -220,7 +221,8 @@ struct ScanFlowView: View {
         DetectedItem(
             name: "",
             expiry: Calendar.current.date(byAdding: .day, value: 5, to: today) ?? today,
-            quantityText: "1 pcs",
+            amount: 1,
+            unit: "pieces",
             sticker: await ImageProcessor.makeSticker(from: image, box: nil)
         )
     }

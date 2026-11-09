@@ -241,7 +241,7 @@ struct FoodDetailSheet: View {
             .buttonStyle(PrimaryButtonStyle())
             .disabled(sharing == .selected && selected.isEmpty)
             .padding(.top, 4)
-            Text("They’ll get a notification and it shows up in their Almost Expired shelf.")
+            Text("They’ll get a notification and it shows up on their Shared shelf.")
                 .font(AppFont.rounded(11, .semibold))
                 .foregroundStyle(Palette.muted)
             cancelButton

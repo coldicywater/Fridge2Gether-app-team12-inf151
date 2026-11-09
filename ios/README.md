@@ -76,7 +76,7 @@ open Fridge2Gether.xcodeproj
 | 原型 (App.tsx) | iOS 文件 |
 |---|---|
 | Onboarding | `Views/Onboarding/OnboardingView.swift` |
-| Home + Fridge 三个区 | `Views/Home/MainView.swift`, `FridgeView.swift` |
+| Home + Fridge（一个人只有 Personal，有室友时 Personal + Shared） | `Views/Home/MainView.swift`, `FridgeView.swift` |
 | CategoryScreen | `Views/Home/MainView.swift` 里的 `CategoryView` |
 | DetailSheet + PortionSelector | `Views/Detail/FoodDetailSheet.swift` |
 | Camera + FoodForm (Review & Edit) | `Views/Scan/ScanFlowView.swift`, `ReviewEditView.swift` |

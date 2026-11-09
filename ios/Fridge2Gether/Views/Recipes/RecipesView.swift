@@ -30,22 +30,39 @@ struct RecipesView: View {
                     .padding(.horizontal, 18)
                     .padding(.bottom, 16)
 
-                // Use these first
+                // Pick ingredients to cook with
                 VStack(alignment: .leading, spacing: 10) {
-                    sectionTitle("Use these first", trailing: store.expiringFoods.isEmpty ? nil : "\(store.expiringFoods.count) expiring")
-                    if store.expiringFoods.isEmpty {
-                        Text("Nothing expiring yet")
+                    sectionTitle("Pick what to cook with", trailing: selected.isEmpty ? nil : "\(selected.count) picked")
+                    if store.visibleFoods.isEmpty {
+                        Text("Your fridge is empty")
                             .font(AppFont.hand(16))
                             .foregroundStyle(Color(hex: 0x5F7770))
                             .padding(.vertical, 6)
                     } else {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 22) {
-                                ForEach(store.expiringFoods) { food in
-                                    StickerView(food: food, size: .small)
+                        Text("Tap ingredients, then make recipes that use all of them.")
+                            .font(AppFont.rounded(11, .semibold))
+                            .foregroundStyle(Color(hex: 0x5F7770))
+                        if !store.expiringFoods.isEmpty {
+                            pickRow("USE THESE FIRST", foods: store.expiringFoods)
+                        }
+                        let fresh = store.visibleFoods.filter { $0.freshness == .fresh }
+                        if !fresh.isEmpty {
+                            pickRow("ALSO IN YOUR FRIDGE", foods: fresh)
+                        }
+                        if !selected.isEmpty {
+                            HStack(spacing: 8) {
+                                Button {
+                                    Task { await store.makeRecipes(with: selectedInOrder) }
+                                } label: {
+                                    Label("Make recipes with \(selected.count == 1 ? "it" : "these \(selected.count)")", systemImage: "sparkles")
                                 }
+                                .buttonStyle(PrimaryButtonStyle())
+                                .disabled(store.recipesLoading)
+                                Button("Clear") { store.recipeSelection = [] }
+                                    .buttonStyle(SecondaryButtonStyle())
+                                    .frame(width: 84)
                             }
-                            .padding(.horizontal, 6)
+                            .padding(.top, 2)
                         }
                     }
                 }
@@ -57,7 +74,9 @@ struct RecipesView: View {
                 // Made for your fridge
                 VStack(alignment: .leading, spacing: 11) {
                     HStack {
-                        Text("Made for your fridge").font(AppFont.rounded(16, .black))
+                        Text(focusTitle)
+                            .font(AppFont.rounded(16, .black))
+                            .lineLimit(2)
                         Spacer()
                         Button {
                             Task { await store.refreshRecipes() }
@@ -67,6 +86,24 @@ struct RecipesView: View {
                                 .foregroundStyle(Palette.muted)
                         }
                         .disabled(store.recipesLoading)
+                    }
+                    if !store.recipesFocus.isEmpty {
+                        Button {
+                            Task { await store.clearRecipeFocus() }
+                        } label: {
+                            Label("Show ideas for the whole fridge", systemImage: "xmark.circle")
+                                .font(AppFont.rounded(11, .black))
+                                .foregroundStyle(Palette.sharedText)
+                        }
+                        .disabled(store.recipesLoading)
+                    }
+                    if store.recipesLoading && !store.recipes.isEmpty {
+                        HStack(spacing: 8) {
+                            ProgressView().tint(Palette.ink)
+                            Text("Making new recipes...")
+                                .font(AppFont.rounded(12, .bold))
+                                .foregroundStyle(Palette.muted)
+                        }
                     }
 
                     HStack(spacing: 7) {
@@ -117,6 +154,62 @@ struct RecipesView: View {
         .background(ScreenBackground())
         .toolbar(.hidden, for: .navigationBar)
         .task { await store.loadRecipesIfNeeded() }
+    }
+
+    /// Picked ingredients that are still in the fridge.
+    private var selected: Set<String> {
+        store.recipeSelection.intersection(store.visibleFoods.map(\.id))
+    }
+
+    /// Same order as the fridge (soonest to expire first).
+    private var selectedInOrder: [String] {
+        store.visibleFoods.map(\.id).filter { selected.contains($0) }
+    }
+
+    private var focusTitle: String {
+        let names = store.recipesFocus.compactMap { store.food(id: $0)?.name }
+        guard !names.isEmpty else { return "Made for your fridge" }
+        return "Made with " + names.joined(separator: ", ")
+    }
+
+    private func pickRow(_ title: String, foods: [Food]) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(AppFont.rounded(9, .black))
+                .tracking(1)
+                .foregroundStyle(Color(hex: 0x5F7770))
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 14) {
+                    ForEach(foods) { food in
+                        let picked = selected.contains(food.id)
+                        Button {
+                            withAnimation(.spring(duration: 0.2)) {
+                                if picked { store.recipeSelection.remove(food.id) } else { store.recipeSelection.insert(food.id) }
+                            }
+                        } label: {
+                            StickerView(food: food, size: .small)
+                                .overlay(alignment: .topTrailing) {
+                                    if picked {
+                                        Image(systemName: "checkmark")
+                                            .font(.system(size: 10, weight: .black))
+                                            .foregroundStyle(.white)
+                                            .frame(width: 22, height: 22)
+                                            .background(Circle().fill(Palette.green))
+                                            .overlay(Circle().stroke(Palette.ink, lineWidth: 2))
+                                            .offset(x: 2, y: -2)
+                                    }
+                                }
+                                .scaleEffect(picked ? 1.06 : 1)
+                                .offset(y: picked ? -2 : 0)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(picked ? "\(food.name), picked" : food.name)
+                    }
+                }
+                .padding(.horizontal, 6)
+                .padding(.vertical, 6)
+            }
+        }
     }
 
     private func sectionTitle(_ title: String, trailing: String?) -> some View {

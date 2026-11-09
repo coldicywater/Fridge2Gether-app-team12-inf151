@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// The blue fridge with Personal / Shared / Almost Expired shelves (status-fridge in the prototype).
+/// The blue fridge. Living alone it has one Personal shelf; with roommates, Personal and Shared.
+/// There's no Almost Expired shelf: the red/yellow sticker ring and the expiry notification cover that.
 struct FridgeView: View {
     @Environment(AppStore.self) private var store
     let onFood: (Food) -> Void
@@ -8,16 +9,15 @@ struct FridgeView: View {
 
     var body: some View {
         VStack(spacing: 7) {
+            let hasRoommates = !store.roommates.isEmpty
             zone(.personal, subtitle: "just yours", foods: store.personalFoods,
                  fill: Palette.shelfWhite, titleColor: Palette.ink)
-                .frame(height: 145)
-            zone(.shared, subtitle: "roommates can use", foods: store.sharedFoods,
-                 fill: Palette.sharedGreen, titleColor: Palette.sharedText)
-                .frame(height: 145)
-            zone(.expiring, subtitle: "use these soon", foods: store.expiringFoods,
-                 fill: Palette.expiringYellow, titleColor: Palette.expiringText,
-                 border: Palette.expiringBorder, inset: Palette.expiringInset)
-                .frame(minHeight: 170)
+                .frame(height: hasRoommates ? 165 : 210)
+            if hasRoommates {
+                zone(.shared, subtitle: "roommates can use", foods: store.sharedFoods,
+                     fill: Palette.sharedGreen, titleColor: Palette.sharedText)
+                    .frame(height: 165)
+            }
         }
         .padding(EdgeInsets(top: 15, leading: 15, bottom: 22, trailing: 15))
         .frame(maxWidth: 330)

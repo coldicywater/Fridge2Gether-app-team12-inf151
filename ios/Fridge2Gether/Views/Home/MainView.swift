@@ -43,8 +43,13 @@ struct MainView: View {
         .ignoresSafeArea(.keyboard)
         .sheet(item: $detailFood) { food in
             FoodDetailSheet(foodId: food.id, onWhatCanIMake: {
+                // Start the Recipes page with this food picked and recipes made around it.
                 detailFood = nil
+                store.recipeSelection = [food.id]
+                store.recipesFocus = [food.id]
+                recipesPath = []
                 tab = .recipes
+                Task { await store.refreshRecipes() }
             })
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
