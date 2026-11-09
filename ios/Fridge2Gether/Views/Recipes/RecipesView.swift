@@ -11,6 +11,7 @@ struct RecipesView: View {
     @Environment(AppStore.self) private var store
     @Binding var path: [RecipeRoute]
     let onProfile: () -> Void
+    let onChat: () -> Void
     @State private var query = ""
 
     private var filtered: [Recipe] {
@@ -24,7 +25,8 @@ struct RecipesView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                ScreenHeader(eyebrow: "RECIPES FOR YOUR FRIDGE", title: "Cook it soon", userName: store.userName, onProfile: onProfile)
+                ScreenHeader(eyebrow: "RECIPES FOR YOUR FRIDGE", title: "Cook it soon", userName: store.userName, onProfile: onProfile,
+                             onChat: onChat, unread: store.unreadChatCount)
                     .padding(.horizontal, 18)
                     .padding(.bottom, 16)
 

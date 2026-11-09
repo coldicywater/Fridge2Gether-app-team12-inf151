@@ -9,6 +9,7 @@ struct MainView: View {
     @State private var detailFood: Food?
     @State private var scanning = false
     @State private var showProfile = false
+    @State private var showChat = false
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -16,15 +17,15 @@ struct MainView: View {
                 switch tab {
                 case .fridge:
                     NavigationStack(path: $fridgePath) {
-                        HomeView(onFood: open, onProfile: { showProfile = true }, onCategory: { fridgePath.append($0) },
-                                 onScan: { scanning = true })
+                        HomeView(onFood: open, onProfile: { showProfile = true }, onChat: { showChat = true },
+                                 onCategory: { fridgePath.append($0) }, onScan: { scanning = true })
                             .navigationDestination(for: FridgeCategory.self) { category in
                                 CategoryView(category: category, onFood: open)
                             }
                     }
                 case .recipes:
                     NavigationStack(path: $recipesPath) {
-                        RecipesView(path: $recipesPath, onProfile: { showProfile = true })
+                        RecipesView(path: $recipesPath, onProfile: { showProfile = true }, onChat: { showChat = true })
                             .navigationDestination(for: RecipeRoute.self) { route in
                                 RecipeRouteView(route: route, path: $recipesPath, onGoHome: goHome)
                             }
@@ -55,6 +56,12 @@ struct MainView: View {
                 tab = .fridge
                 fridgePath = []
             })
+        }
+        .sheet(isPresented: $showChat) {
+            ChatView()
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(30)
         }
         .sheet(isPresented: $showProfile) {
             ProfileSheet()
@@ -88,6 +95,7 @@ struct HomeView: View {
     @Environment(AppStore.self) private var store
     let onFood: (Food) -> Void
     let onProfile: () -> Void
+    let onChat: () -> Void
     let onCategory: (FridgeCategory) -> Void
     let onScan: () -> Void
 
@@ -100,7 +108,8 @@ struct HomeView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 12) {
-                ScreenHeader(eyebrow: greeting, title: "My Fridge", userName: store.userName, onProfile: onProfile)
+                ScreenHeader(eyebrow: greeting, title: "My Fridge", userName: store.userName, onProfile: onProfile,
+                             onChat: onChat, unread: store.unreadChatCount)
                     .padding(.bottom, 4)
 
                 if let offer = store.activeOffer {

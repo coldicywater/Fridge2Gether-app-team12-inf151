@@ -33,6 +33,15 @@ service cloud.firestore {
       match /offers/{offerId} {
         allow read, write: if isMember(fridgeId);
       }
+
+      // Fridge group chat. You can only post as yourself; the only edit allowed
+      // is answering a request ("I've got it"). Messages can't be deleted.
+      match /messages/{messageId} {
+        allow read: if isMember(fridgeId);
+        allow create: if isMember(fridgeId) && request.resource.data.senderId == request.auth.uid;
+        allow update: if isMember(fridgeId) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fulfilledById', 'fulfilledByName']);
+      }
     }
   }
 }

@@ -60,6 +60,17 @@ open Fridge2Gether.xcodeproj
 
 想重置成新用户：删掉 app 重装。
 
+## 冰箱群聊
+
+首页和菜谱页右上角，头像左边的气泡按钮。每个冰箱一个群，成员就是共享这个冰箱的室友，切换冰箱就换群。有新消息时按钮上有红色数字。
+
+- 普通文字消息
+- **+ → Ask for food**：发请求卡片，别人点 "I've got it"
+- **+ → Offer my food**：选自己的食物分享给所有人，室友在群里点 I'll Take It 认领
+- **自动提示**（灰色小字）：加入共享食物、用掉一部分、用完、认领、做菜用了共享食材、有人加入或离开。只提示设成 Everyone 的食物，Just Me 和 Selected 的不会出现在群里
+
+**升级注意**：`firestore.rules` 新增了 `messages` 规则，要重新整段贴到 Firebase 控制台的 Rules 里点 Publish，不然发不出消息。新增了 `Views/Chat/ChatView.swift`，要重新跑一次 `xcodegen`。
+
 ## 和原型的对应关系
 
 | 原型 (App.tsx) | iOS 文件 |
@@ -90,6 +101,8 @@ fridges/{fridgeId}           inviteCode, memberIds[], memberNames{uid:name}
                              ownerId, ownerName, sharing(justMe|everyone|selected), sharedWith[]
   offers/{offerId}           foodId, foodName, fromId, fromName, recipientIds[],
                              claimedById, dismissedBy[]
+  messages/{messageId}       kind(text|event|request|offer), text, senderId, senderName,
+                             offerId, fulfilledById, fulfilledByName, createdAt
 ```
 
 Freshness 按过期天数算：≤1 天红圈 (urgent)，≤3 天黄圈 (soon)，其余正常。

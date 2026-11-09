@@ -276,3 +276,38 @@ struct DetectedItem: Identifiable {
         return (1, trimmed.isEmpty ? "pcs" : trimmed)
     }
 }
+
+// MARK: - Chat (one group per fridge)
+
+/// fridges/{fridgeId}/messages/{id}
+struct ChatMessage: Identifiable, Codable, Hashable {
+    enum Kind: String, Codable {
+        /// Something a roommate typed.
+        case text
+        /// Automatic note: food added, used up, claimed, someone joined.
+        case event
+        /// "Does anyone have eggs?" Roommates can answer with "I've got it".
+        case request
+        /// "Carrie is sharing milk": links to an Offer so it can be claimed from the chat.
+        case offer
+
+        init(from decoder: Decoder) throws {
+            let raw = try decoder.singleValueContainer().decode(String.self)
+            self = Kind(rawValue: raw) ?? .event
+        }
+    }
+
+    var id: String = ""
+    var kind: Kind
+    var text: String
+    var senderId: String
+    var senderName: String
+    var offerId: String?
+    var fulfilledById: String?
+    var fulfilledByName: String?
+    var createdAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case kind, text, senderId, senderName, offerId, fulfilledById, fulfilledByName, createdAt
+    }
+}

@@ -28,6 +28,10 @@ final class AppStore {
     private(set) var currentFridgeId = ""
     var foods: [Food] = []
     var offers: [Offer] = []
+    /// Chat for the fridge on screen, oldest first.
+    var messages: [ChatMessage] = []
+    /// When I last looked at this fridge's chat. Roommates' messages after it count as unread.
+    var chatLastRead: Date = .distantPast
 
     var recipes: [Recipe] = []
     var recipesLoading = false
@@ -121,6 +125,7 @@ final class AppStore {
         guard let doc = result.documents.first else {
             throw AppError.message("No fridge found with code \(cleaned).")
         }
+        let wasMember = (doc.data()["memberIds"] as? [String] ?? []).contains(uid)
         try await doc.reference.updateData([
             "memberIds": FieldValue.arrayUnion([uid]),
             "memberNames.\(uid)": name,
@@ -129,6 +134,7 @@ final class AppStore {
         // Keep the fridges I already have; just add this one and switch to it.
         if !fridgeIds.contains(doc.documentID) { fridgeIds.append(doc.documentID) }
         attach(fridgeId: doc.documentID)
+        if !wasMember { post(message(.event, "\(name) joined the fridge."), to: doc.documentID) }
         try await persistUser()
         phase = .ready
         NotificationService.requestPermission()
@@ -184,6 +190,8 @@ final class AppStore {
     func leaveFridge() async {
         let leavingId = currentFridgeId
         guard !leavingId.isEmpty else { return }
+        // Sent before leaving: once I'm not a member I can't write to the chat.
+        if !roommates.isEmpty { post(message(.event, "\(userName) left the fridge."), to: leavingId) }
         do {
             try await db.collection("fridges").document(leavingId).updateData([
                 "memberIds": FieldValue.arrayRemove([uid]),
@@ -214,6 +222,10 @@ final class AppStore {
 
     private func offersRef(_ fridgeId: String) -> CollectionReference {
         db.collection("fridges").document(fridgeId).collection("offers")
+    }
+
+    private func messagesRef(_ fridgeId: String) -> CollectionReference {
+        db.collection("fridges").document(fridgeId).collection("messages")
     }
 
     private func attach(fridgeId: String) {
@@ -257,7 +269,20 @@ final class AppStore {
                     self.offers = items
                 }
             }
-        listeners = [fridgeListener, foodsListener, offersListener]
+        let messagesListener = messagesRef(fridgeId)
+            .order(by: "createdAt", descending: true)
+            .limit(to: 150)
+            .addSnapshotListener { [weak self] snapshot, _ in
+                guard let snapshot else { return }
+                let items: [ChatMessage] = snapshot.documents.compactMap { doc in
+                    guard var message = try? doc.data(as: ChatMessage.self) else { return nil }
+                    message.id = doc.documentID
+                    return message
+                }
+                Task { @MainActor in self?.messages = items.reversed() }
+            }
+        loadChatLastRead(fridgeId)
+        listeners = [fridgeListener, foodsListener, offersListener, messagesListener]
     }
 
     private func detach() {
@@ -266,6 +291,7 @@ final class AppStore {
         fridge = nil
         foods = []
         offers = []
+        messages = []
         recipes = []
         recipesInventoryKey = ""
         highlightedFoodIds = []
@@ -339,39 +365,56 @@ final class AppStore {
             try batch.setData(from: food, forDocument: foodsRef(fridge.id).document())
         }
         try await batch.commit()
+        // Only food shared with everyone is announced, so private items stay private.
+        let shared = items
+            .filter { $0.sharing == .everyone }
+            .map { $0.name.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+        if !shared.isEmpty && !roommates.isEmpty {
+            post(message(.event, "\(userName) added \(Self.list(shared)) to the shared fridge."), to: fridge.id)
+        }
     }
 
     /// "I Used Some" and the post-cooking update. Empty removes the item.
     /// Updates the screen right away, then saves; if the save fails it rolls back and reports why.
-    func setAmount(_ food: Food, amount: Double) async {
+    /// `announce: false` skips the chat note (the recipe flow posts one summary instead).
+    func setAmount(_ food: Food, amount: Double, announce: Bool = true) async {
         let fridgeId = currentFridgeId
         guard !fridgeId.isEmpty else {
             report(AppError.message("No fridge is open. Try again in a moment."))
             return
         }
         if amount <= 0 {
-            await remove(food)
+            await remove(food, announce: announce)
             return
         }
-        let previous = self.food(id: food.id)?.amount ?? food.amount
+        let current = self.food(id: food.id) ?? food
+        let previous = current.amount
         patchLocal(food.id) { $0.amount = amount }
         do {
             try await foodsRef(fridgeId).document(food.id).updateData(["amount": amount])
+            if announce && amount < previous && current.sharing == .everyone && !roommates.isEmpty {
+                post(message(.event, "\(userName) used some of \(phrase(current)). \(Food.format(amount)) \(current.unit) left."), to: fridgeId)
+            }
         } catch {
             patchLocal(food.id) { $0.amount = previous }
             report(error)
         }
     }
 
-    func remove(_ food: Food) async {
+    func remove(_ food: Food, announce: Bool = true) async {
         let fridgeId = currentFridgeId
         guard !fridgeId.isEmpty else {
             report(AppError.message("No fridge is open. Try again in a moment."))
             return
         }
+        let current = self.food(id: food.id) ?? food
         highlightedFoodIds.remove(food.id)
         do {
             try await foodsRef(fridgeId).document(food.id).delete()
+            if announce && current.sharing == .everyone && !roommates.isEmpty {
+                post(message(.event, "\(userName) used up \(phrase(current))."), to: fridgeId)
+            }
         } catch {
             report(error)
         }
@@ -424,7 +467,10 @@ final class AppStore {
             claimedByName: nil,
             createdAt: Date()
         )
-        try? offersRef(fridge.id).document().setData(from: offer)
+        let ref = offersRef(fridge.id).document()
+        try? ref.setData(from: offer)
+        let who = everyone ? "everyone" : Self.list(ids.map { memberName($0) })
+        post(message(.offer, "\(userName) is sharing \(food.name) with \(who). \(food.daysLabel).", offerId: ref.documentID), to: fridge.id)
     }
 
     /// "I'll take it": the food moves to my personal fridge.
@@ -442,8 +488,108 @@ final class AppStore {
             "claimedByName": userName,
             "dismissedBy": FieldValue.arrayUnion([uid]),
         ], forDocument: offersRef(fridge.id).document(offer.id))
+        let note = message(.event, "\(userName) took \(offer.fromName)'s \(offer.foodName.lowercased()).")
+        try? batch.setData(from: note, forDocument: messagesRef(fridge.id).document())
         highlightedFoodIds.remove(offer.foodId)
         try? await batch.commit()
+    }
+
+    // MARK: - Chat
+
+    var unreadChatCount: Int {
+        messages.filter { $0.senderId != uid && $0.createdAt > chatLastRead }.count
+    }
+
+    func sendChat(_ text: String) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        post(message(.text, trimmed), to: currentFridgeId)
+    }
+
+    /// "Can I have 2 eggs?" Shows as a card roommates can answer.
+    func askFor(_ text: String) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        post(message(.request, trimmed), to: currentFridgeId)
+    }
+
+    /// "I've got it" on a roommate's request.
+    func fulfill(_ request: ChatMessage) async {
+        let fridgeId = currentFridgeId
+        guard !fridgeId.isEmpty, request.fulfilledById == nil, request.senderId != uid else { return }
+        do {
+            try await messagesRef(fridgeId).document(request.id).updateData([
+                "fulfilledById": uid,
+                "fulfilledByName": userName,
+            ])
+            post(message(.event, "\(userName) can help \(request.senderName) with that."), to: fridgeId)
+        } catch {
+            report(error)
+        }
+    }
+
+    /// One note after cooking instead of one per ingredient.
+    func postCooked(_ recipeName: String, used: [Food]) {
+        let shared = used.filter { $0.sharing == .everyone }
+        guard !shared.isEmpty, !roommates.isEmpty else { return }
+        post(message(.event, "\(userName) cooked \(recipeName) with \(Self.list(shared.map { phrase($0) }))."), to: currentFridgeId)
+    }
+
+    func markChatRead() {
+        let latest = max(messages.last?.createdAt ?? .distantPast, Date())
+        guard latest > chatLastRead, !currentFridgeId.isEmpty else { return }
+        chatLastRead = latest
+        UserDefaults.standard.set(latest.timeIntervalSince1970, forKey: "chatLastRead-\(currentFridgeId)")
+    }
+
+    /// A fridge I open for the first time starts with nothing unread.
+    private func loadChatLastRead(_ fridgeId: String) {
+        let key = "chatLastRead-\(fridgeId)"
+        let saved = UserDefaults.standard.double(forKey: key)
+        if saved > 0 {
+            chatLastRead = Date(timeIntervalSince1970: saved)
+        } else {
+            chatLastRead = Date()
+            UserDefaults.standard.set(chatLastRead.timeIntervalSince1970, forKey: key)
+        }
+    }
+
+    private func message(_ kind: ChatMessage.Kind, _ text: String, offerId: String? = nil) -> ChatMessage {
+        ChatMessage(
+            kind: kind,
+            text: text,
+            senderId: uid,
+            senderName: userName,
+            offerId: offerId,
+            fulfilledById: nil,
+            fulfilledByName: nil,
+            createdAt: Date()
+        )
+    }
+
+    private func post(_ message: ChatMessage, to fridgeId: String) {
+        guard !fridgeId.isEmpty else { return }
+        do {
+            try messagesRef(fridgeId).document().setData(from: message)
+        } catch {
+            report(error)
+        }
+    }
+
+    /// "the milk" for my food, "Alex's milk" for a roommate's.
+    private func phrase(_ food: Food) -> String {
+        let name = food.name.lowercased()
+        return food.ownerId == uid ? "the \(name)" : "\(food.ownerName)'s \(name)"
+    }
+
+    /// "a", "a and b", "a, b and c", "a, b, c +2"
+    private static func list(_ items: [String]) -> String {
+        switch items.count {
+        case 0: return ""
+        case 1: return items[0]
+        case 2...3: return items.dropLast().joined(separator: ", ") + " and " + items.last!
+        default: return items.prefix(3).joined(separator: ", ") + " +\(items.count - 3)"
+        }
     }
 
     func dismiss(_ offer: Offer) async {

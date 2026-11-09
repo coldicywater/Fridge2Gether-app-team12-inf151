@@ -136,6 +136,9 @@ struct ScreenHeader: View {
     let title: String
     let userName: String
     let onProfile: () -> Void
+    /// Fridge group chat. Hidden when nil.
+    var onChat: (() -> Void)? = nil
+    var unread: Int = 0
 
     private var initials: String {
         let parts = userName.split(separator: " ").compactMap(\.first)
@@ -152,6 +155,31 @@ struct ScreenHeader: View {
                     .tracking(-1.2)
             }
             Spacer()
+            if let onChat {
+                Button(action: onChat) {
+                    Image(systemName: "bubble.left.and.bubble.right.fill")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(Palette.ink)
+                        .frame(width: 44, height: 44)
+                        .background(Circle().fill(Palette.mint))
+                        .overlay(Circle().stroke(Palette.ink, lineWidth: 2))
+                        .background(Circle().fill(Palette.ink).offset(y: 2))
+                        .overlay(alignment: .topTrailing) {
+                            if unread > 0 {
+                                Text(unread > 9 ? "9+" : "\(unread)")
+                                    .font(AppFont.rounded(10, .black))
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 5)
+                                    .frame(minWidth: 20, minHeight: 20)
+                                    .background(Capsule().fill(Palette.coral))
+                                    .overlay(Capsule().stroke(.white, lineWidth: 2))
+                                    .offset(x: 5, y: -4)
+                            }
+                        }
+                }
+                .accessibilityLabel(unread > 0 ? "Fridge chat, \(unread) new" : "Fridge chat")
+                .padding(.trailing, 6)
+            }
             Button(action: onProfile) {
                 Text(initials)
                     .font(AppFont.rounded(13, .black))

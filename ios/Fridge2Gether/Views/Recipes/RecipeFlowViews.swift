@@ -307,10 +307,12 @@ struct UpdateIngredientsView: View {
             guard abs(amount - food.amount) > 0.001 else { return nil }
             return (food, amount)
         }
+        let cooked = recipe.name
         Task {
             for (food, amount) in updates {
-                await store.setAmount(food, amount: amount)
+                await store.setAmount(food, amount: amount, announce: false)
             }
+            store.postCooked(cooked, used: updates.map(\.0))
             saving = false
             onGoHome()
         }
