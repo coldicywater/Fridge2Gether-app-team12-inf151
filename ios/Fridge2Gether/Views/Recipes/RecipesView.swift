@@ -67,6 +67,7 @@ struct RecipesView: View {
                     }
                 }
                 .padding(EdgeInsets(top: 13, leading: 18, bottom: 12, trailing: 18))
+                .tutorialTarget(.recipePick)
                 .background(Color(hex: 0xDFF1EA))
                 .overlay(alignment: .top) { Rectangle().fill(Palette.ink).frame(height: 2) }
                 .overlay(alignment: .bottom) { Rectangle().fill(Palette.ink).frame(height: 2) }
@@ -84,7 +85,9 @@ struct RecipesView: View {
                             Label("New ideas", systemImage: "arrow.clockwise")
                                 .font(AppFont.rounded(11, .black))
                                 .foregroundStyle(Palette.muted)
+                                .padding(.vertical, 4)
                         }
+                        .tutorialTarget(.recipeRefresh)
                         .disabled(store.recipesLoading)
                     }
                     if !store.recipesFocus.isEmpty {
@@ -141,8 +144,13 @@ struct RecipesView: View {
                     }
 
                     ForEach(filtered) { recipe in
-                        Button { path.append(.detail(recipe)) } label: { RecipeCard(recipe: recipe) }
+                        let card = Button { path.append(.detail(recipe)) } label: { RecipeCard(recipe: recipe) }
                             .buttonStyle(.plain)
+                        if recipe.id == filtered.first?.id {
+                            card.tutorialTarget(.recipeCard)
+                        } else {
+                            card
+                        }
                     }
                     .opacity(store.recipesLoading ? 0.5 : 1)
                 }
@@ -154,6 +162,15 @@ struct RecipesView: View {
         .background(ScreenBackground())
         .toolbar(.hidden, for: .navigationBar)
         .task { await store.loadRecipesIfNeeded() }
+        // Waits for the first recipes so the tour can point at one.
+        .onChange(of: store.recipes.isEmpty) {
+            if !store.recipes.isEmpty { store.startTour(.recipes) }
+        }
+        .onAppear { if !store.recipes.isEmpty { store.startTour(.recipes) } }
+        .onDisappear { store.cancelTour(.recipes) }
+        .overlay {
+            if store.activeTour == .recipes { TutorialOverlay(tour: .recipes) }
+        }
     }
 
     /// Picked ingredients that are still in the fridge.

@@ -30,6 +30,9 @@ struct FoodDetailSheet: View {
         }
         .background(Palette.card.ignoresSafeArea())
         .presentationDetents([.medium, .large], selection: $detent)
+        // First time: open full height so the tour can reach every button.
+        .onAppear { if store.tourPending(.detail) { detent = .large } }
+        .tour(.detail)
         .onChange(of: panel) {
             if panel != .main { withAnimation { detent = .large } }
         }
@@ -71,7 +74,9 @@ struct FoodDetailSheet: View {
                 // Facts grid
                 LazyVGrid(columns: [GridItem(.flexible(), spacing: 7), GridItem(.flexible())], spacing: 7) {
                     fact("Quantity", food.quantityLabel, editable: true) { panel = .quantity }
+                        .tutorialTarget(.detailQuantity)
                     fact("Expires", "\(food.dateLabel) · \(food.daysLabel)", editable: true) { editExpiry(food) }
+                        .tutorialTarget(.detailExpiry)
                     fact("Owner", isMine ? "\(store.userName) (you)" : food.ownerName)
                     fact("Sharing", sharingLabel(food, isMine: isMine))
                 }
@@ -113,6 +118,7 @@ struct FoodDetailSheet: View {
                     Label("What can I make with it?", systemImage: "sparkles")
                 }
                 .buttonStyle(SecondaryButtonStyle(fill: Color(hex: 0xFFF0C3)))
+                .tutorialTarget(.detailCook)
             }
             HStack(spacing: 8) {
                 Button("I Used Some") { panel = .quantity }
@@ -126,6 +132,7 @@ struct FoodDetailSheet: View {
                     }
                 }
                 .buttonStyle(SecondaryButtonStyle(textColor: Palette.danger))
+                .tutorialTarget(.detailUsedUp)
                 if almostExpired && isMine && !store.roommates.isEmpty {
                     shareButton(title: "Share it with...") {
                         sharing = .selected
@@ -150,6 +157,7 @@ struct FoodDetailSheet: View {
             Label(title, systemImage: "person.2")
         }
         .buttonStyle(SecondaryButtonStyle(fill: Palette.mint))
+        .tutorialTarget(.detailShare)
     }
 
     private func quantityPanel(_ food: Food) -> some View {

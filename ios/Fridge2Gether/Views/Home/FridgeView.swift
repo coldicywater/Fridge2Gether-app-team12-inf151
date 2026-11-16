@@ -51,8 +51,9 @@ struct FridgeView: View {
             .frame(width: 36, height: 14)
     }
 
+    @ViewBuilder
     private func sticker(_ food: Food) -> some View {
-        Button { onFood(food) } label: {
+        let button = Button { onFood(food) } label: {
             StickerView(
                 food: food,
                 highlighted: store.highlightedFoodIds.contains(food.id),
@@ -60,6 +61,12 @@ struct FridgeView: View {
             )
         }
         .buttonStyle(.plain)
+        // The tour points at the first food on the top shelf.
+        if food.id == (store.personalFoods.first ?? store.sharedFoods.first)?.id {
+            button.tutorialTarget(.food)
+        } else {
+            button
+        }
     }
 
     private func zone(_ category: FridgeCategory, subtitle: String, foods: [Food], fill: Color, titleColor: Color,
@@ -122,6 +129,7 @@ struct FridgeView: View {
             }
         }
         .contentShape(RoundedRectangle(cornerRadius: 15))
+        .tutorialTarget(category == .shared ? .sharedShelf : .personalShelf)
         .onTapGesture { onCategory(category) }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("\(category.title), \(foods.count) items")

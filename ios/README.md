@@ -62,9 +62,17 @@ open Fridge2Gether.xcodeproj
 
 ## 新手引导（Week 8）
 
-- **介绍页**（`Views/Onboarding/IntroView.swift`）：新用户第一次打开，先看 3 页介绍：管理食材、追踪过期日期、和室友一起减少浪费。可以左右滑或点 Next，右上角能 Skip。看完才进入输名字、建冰箱或加入冰箱。
-- **首页教程**（`Views/Tutorial/TutorialOverlay.swift`）：第一次进首页时，屏幕变暗，依次高亮相机按钮、冰箱、Recipes 按钮、聊天按钮，每一步一张说明卡片（Camera / Ingredient Management / Recipes / Chat）。每台设备只自动出现一次。
-- **重看教程**：点右上角头像 → Show app tutorial。
+- **介绍页**（`Views/Onboarding/IntroView.swift`）：新用户第一次打开，先看 3 页一句话介绍，再输名字、建冰箱或加入冰箱。
+- **分页面教程**（`Views/Tutorial/TutorialOverlay.swift`）：每个页面第一次打开时，屏幕变暗，高亮具体按钮，一步一句话：
+  - 首页：Personal、Shared、点食物、快过期横幅、相机、Recipes、聊天、头像
+  - 食物详情：改用量、改过期日期、Used Up、共享、做菜
+  - 拍照：快门、从相册选
+  - 识别结果：选食物、数量和量词、过期日期、共享、保存
+  - 菜谱：挑食材、打开菜谱、换一批
+  - 聊天：+（要食物 / 送食物）、发消息
+  - 头像资料：邀请码、切换和加入冰箱
+- 页面上没有的东西会自动跳过（比如没室友就不讲 Shared）。
+- **重看教程**：头像 → Show app tutorial，所有页面的教程都会重新出现。
 - 想重新看介绍页：删掉 app 重装。
 
 ## 冰箱群聊

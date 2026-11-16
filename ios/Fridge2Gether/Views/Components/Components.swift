@@ -195,6 +195,7 @@ struct ScreenHeader: View {
                             .overlay(Circle().stroke(.white, lineWidth: 2))
                             .offset(x: 2, y: 1)
                     }
+                    .tutorialTarget(.profile)
             }
             .accessibilityLabel("Profile and roommates")
         }

@@ -41,17 +41,11 @@ struct MainView: View {
             }
         }
         .ignoresSafeArea(.keyboard)
-        .overlay {
-            if store.showTutorial && tab == .fridge && fridgePath.isEmpty {
-                TutorialOverlay()
-            }
-        }
-        .onAppear {
-            // Wait a moment so the home screen has laid out before the spotlight looks for things.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { store.startTutorialIfNeeded() }
-        }
-        .onChange(of: store.showTutorial) {
-            guard store.showTutorial else { return }
+        // On the shell so the spotlight covers the bottom nav (camera, Recipes) too.
+        .tour(.home)
+        .onChange(of: store.activeTour) {
+            // Replaying from the profile: go back to the home screen for the Home tour.
+            guard store.activeTour == .home else { return }
             showProfile = false
             fridgePath = []
             tab = .fridge
@@ -84,7 +78,8 @@ struct MainView: View {
         }
         .sheet(isPresented: $showProfile) {
             ProfileSheet()
-                .presentationDetents([.medium, .large])
+                // Full height the first time, so the tour can point at the invite code.
+                .presentationDetents(store.tourPending(.profile) ? [.large] : [.medium, .large])
         }
         .storeErrorAlert()
     }
@@ -157,10 +152,10 @@ struct HomeView: View {
                     .accessibilityLabel("Take a photo of your groceries")
                 } else if !store.expiringFoods.isEmpty {
                     ExpiringWarning(count: store.expiringFoods.count) { onCategory(.expiring) }
+                        .tutorialTarget(.expiringBanner)
                 }
 
                 FridgeView(onFood: onFood, onCategory: onCategory)
-                    .tutorialTarget(.fridge)
                     .padding(.top, 4)
                     .padding(.bottom, 24)
             }

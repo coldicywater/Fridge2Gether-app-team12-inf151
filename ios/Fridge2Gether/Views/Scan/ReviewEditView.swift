@@ -26,6 +26,7 @@ struct ReviewEditView: View {
                     .padding(.bottom, 10)
 
                 stickerStrip
+                    .tutorialTarget(.reviewStickers)
 
                 if !items.isEmpty {
                     let id = items[safeIndex].id
@@ -50,6 +51,7 @@ struct ReviewEditView: View {
                 }
                 .buttonStyle(PrimaryButtonStyle())
                 .disabled(validCount == 0 || saving)
+                .tutorialTarget(.reviewAdd)
                 .padding(.top, 16)
             }
             .padding(.horizontal, 20)
@@ -63,6 +65,7 @@ struct ReviewEditView: View {
                 .ignoresSafeArea()
         )
         .overlay { if saving { ProgressView().tint(Palette.ink).scaleEffect(1.3) } }
+        .tour(.review)
     }
 
     private var validCount: Int {
@@ -143,7 +146,9 @@ struct ReviewEditView: View {
                     .background(RoundedRectangle(cornerRadius: 13).fill(Color(hex: 0xFFFDF9)))
                     .overlay(RoundedRectangle(cornerRadius: 13).stroke(Palette.ink, lineWidth: 2))
             }
+            .tutorialTarget(.reviewExpiry)
             QuantityEditor(amount: item.amount, unit: item.unit)
+                .tutorialTarget(.reviewQuantity)
 
             VStack(alignment: .leading, spacing: 6) {
                 FieldLabel(text: "Sharing")
@@ -153,6 +158,7 @@ struct ReviewEditView: View {
                             .buttonStyle(ChipButtonStyle(selected: item.wrappedValue.sharing == option))
                     }
                 }
+                .tutorialTarget(.reviewSharing)
                 if item.wrappedValue.sharing == .selected {
                     RoommatePicker(
                         roommates: store.roommates,

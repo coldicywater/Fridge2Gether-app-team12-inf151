@@ -49,6 +49,7 @@ struct ChatView: View {
                 .presentationDragIndicator(.visible)
         }
         .storeErrorAlert()
+        .tour(.chat)
     }
 
     // MARK: Header
@@ -199,6 +200,7 @@ struct ChatView: View {
                     .overlay(Circle().stroke(Palette.ink, lineWidth: 2))
             }
             .accessibilityLabel("Ask for or offer food")
+            .tutorialTarget(.chatPlus)
 
             TextField("Message your fridge", text: $draft, axis: .vertical)
                 .lineLimit(1...4)
@@ -208,6 +210,7 @@ struct ChatView: View {
                 .padding(.vertical, 10)
                 .background(RoundedRectangle(cornerRadius: 21).fill(Color(hex: 0xFFFDF9)))
                 .overlay(RoundedRectangle(cornerRadius: 21).stroke(Palette.ink, lineWidth: 2))
+                .tutorialTarget(.chatInput)
 
             Button(action: send) {
                 Image(systemName: "arrow.up")

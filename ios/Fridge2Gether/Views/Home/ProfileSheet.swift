@@ -62,9 +62,11 @@ struct ProfileSheet: View {
                         FieldLabel(text: "Invite code")
                         InviteCodeCard(code: code)
                     }
+                    .tutorialTarget(.profileInvite)
                 }
 
                 fridgesSection
+                    .tutorialTarget(.profileFridges)
 
                 Button {
                     save()
@@ -87,6 +89,7 @@ struct ProfileSheet: View {
         .background(LinearGradient(colors: [Color(hex: 0xDFF1E9), Palette.cream], startPoint: .top, endPoint: .bottom).ignoresSafeArea())
         .onAppear { name = store.userName }
         .task { await store.loadMyFridges() }
+        .tour(.profile)
         .disabled(busy)
         .confirmationDialog("Leave this fridge?", isPresented: $confirmLeave, titleVisibility: .visible) {
             Button("Leave", role: .destructive) {

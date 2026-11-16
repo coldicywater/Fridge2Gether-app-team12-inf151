@@ -96,6 +96,7 @@ struct ScanFlowView: View {
                             .background(Circle().fill(.black.opacity(0.35)))
                     }
                     .accessibilityLabel("Choose from library")
+                    .tutorialTarget(.cameraLibrary)
                     Spacer()
                     Button {
                         camera.capture { image in
@@ -110,6 +111,7 @@ struct ScanFlowView: View {
                     .disabled(!camera.isAvailable)
                     .opacity(camera.isAvailable ? 1 : 0.35)
                     .accessibilityLabel("Take photo")
+                    .tutorialTarget(.cameraShutter)
                     Spacer()
                     Color.clear.frame(width: 50, height: 50)
                 }
@@ -121,6 +123,7 @@ struct ScanFlowView: View {
         }
         .onAppear { camera.start() }
         .onDisappear { camera.stop() }
+        .tour(.camera)
     }
 
     // MARK: Analyzing

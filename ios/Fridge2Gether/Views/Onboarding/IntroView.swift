@@ -15,14 +15,14 @@ struct IntroView: View {
 
     private let pages: [Page] = [
         Page(icon: "refrigerator", tint: Palette.fridgeBlue,
-             title: "Everything in your fridge, in one place",
-             text: "Fridge2Gether keeps track of the food you have, so you know what's there without opening the door."),
+             title: "Your fridge, on your phone",
+             text: "See everything you have at a glance."),
         Page(icon: "calendar.badge.clock", tint: Color(hex: 0xFCE3A3),
              title: "Know what expires next",
-             text: "Snap a photo of your groceries and the app estimates when each one expires. Yellow and red rings show what to eat first, and you get a reminder the day before."),
+             text: "Get a reminder before food goes bad."),
         Page(icon: "leaf", tint: Palette.mint,
-             title: "Waste less food, together",
-             text: "Share food with your roommates, get recipe ideas from what you already have, and give away food before it goes bad."),
+             title: "Waste less, together",
+             text: "Share food and recipes with your roommates."),
     ]
 
     private var isLast: Bool { page == pages.count - 1 }

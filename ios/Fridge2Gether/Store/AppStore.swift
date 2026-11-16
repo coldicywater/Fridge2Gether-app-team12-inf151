@@ -48,11 +48,10 @@ final class AppStore {
     /// Set when a save fails, so the UI can say so instead of failing silently.
     var lastError: String?
 
-    /// First-run tips on the home screen (camera, fridge, recipes, chat).
-    var showTutorial = false
+    /// The guided tour on screen right now, if any.
+    var activeTour: Tour?
     /// Where each tutorial target is on screen, so the overlay can highlight it.
-    var tutorialFrames: [TutorialTarget: CGRect] = [:]
-    private static let tutorialSeenKey = "tutorialSeen"
+    var tutorialFrames: [TutorialTarget: TargetFrame] = [:]
 
     @ObservationIgnored private var listeners: [ListenerRegistration] = []
     private var db: Firestore { Firestore.firestore() }
@@ -675,28 +674,48 @@ final class AppStore {
 
     // MARK: - Tutorial
 
-    /// Shows the tips once per device, the first time the home screen opens.
-    func startTutorialIfNeeded() {
-        guard !UserDefaults.standard.bool(forKey: Self.tutorialSeenKey) else { return }
-        showTutorial = true
+    /// Not seen on this device yet.
+    func tourPending(_ tour: Tour) -> Bool {
+        !UserDefaults.standard.bool(forKey: tour.seenKey)
     }
 
-    /// "Show app tutorial" in the profile.
+    /// Plays `tour` the first time its screen opens. Waits a moment so the screen has laid out.
+    func startTour(_ tour: Tour) {
+        guard tourPending(tour) else { return }
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(700))
+            guard activeTour == nil, tourPending(tour) else { return }
+            activeTour = tour
+        }
+    }
+
+    func finishTour(_ tour: Tour) {
+        UserDefaults.standard.set(true, forKey: tour.seenKey)
+        if activeTour == tour { withAnimation { activeTour = nil } }
+    }
+
+    /// The screen closed mid-tour: stop, and show it again next time.
+    func cancelTour(_ tour: Tour) {
+        if activeTour == tour { activeTour = nil }
+    }
+
+    /// "Show app tutorial" in the profile: every screen's tour plays again, starting with Home.
     func replayTutorial() {
-        showTutorial = true
+        for tour in Tour.allCases { UserDefaults.standard.removeObject(forKey: tour.seenKey) }
+        activeTour = nil
+        startTour(.home)
     }
 
-    func finishTutorial() {
-        showTutorial = false
-        UserDefaults.standard.set(true, forKey: Self.tutorialSeenKey)
-    }
-
-    func setTutorialFrame(_ frame: CGRect, for target: TutorialTarget) {
+    func setTutorialFrame(_ rect: CGRect, for target: TutorialTarget, owner: UUID) {
         // Skip tiny changes so scrolling doesn't redraw the overlay for nothing.
-        if let old = tutorialFrames[target],
-           abs(old.minX - frame.minX) < 0.5, abs(old.minY - frame.minY) < 0.5,
-           abs(old.width - frame.width) < 0.5, abs(old.height - frame.height) < 0.5 { return }
-        tutorialFrames[target] = frame
+        if let old = tutorialFrames[target], old.owner == owner,
+           abs(old.rect.minX - rect.minX) < 0.5, abs(old.rect.minY - rect.minY) < 0.5,
+           abs(old.rect.width - rect.width) < 0.5, abs(old.rect.height - rect.height) < 0.5 { return }
+        tutorialFrames[target] = TargetFrame(owner: owner, rect: rect)
+    }
+
+    func clearTutorialFrame(for target: TutorialTarget, owner: UUID) {
+        if tutorialFrames[target]?.owner == owner { tutorialFrames[target] = nil }
     }
 
     // MARK: - Helpers
