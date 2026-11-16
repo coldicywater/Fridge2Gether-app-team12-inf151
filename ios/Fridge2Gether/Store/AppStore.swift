@@ -48,6 +48,12 @@ final class AppStore {
     /// Set when a save fails, so the UI can say so instead of failing silently.
     var lastError: String?
 
+    /// First-run tips on the home screen (camera, fridge, recipes, chat).
+    var showTutorial = false
+    /// Where each tutorial target is on screen, so the overlay can highlight it.
+    var tutorialFrames: [TutorialTarget: CGRect] = [:]
+    private static let tutorialSeenKey = "tutorialSeen"
+
     @ObservationIgnored private var listeners: [ListenerRegistration] = []
     private var db: Firestore { Firestore.firestore() }
 
@@ -665,6 +671,32 @@ final class AppStore {
             recipesError = Self.friendly(error)
         }
         recipesLoading = false
+    }
+
+    // MARK: - Tutorial
+
+    /// Shows the tips once per device, the first time the home screen opens.
+    func startTutorialIfNeeded() {
+        guard !UserDefaults.standard.bool(forKey: Self.tutorialSeenKey) else { return }
+        showTutorial = true
+    }
+
+    /// "Show app tutorial" in the profile.
+    func replayTutorial() {
+        showTutorial = true
+    }
+
+    func finishTutorial() {
+        showTutorial = false
+        UserDefaults.standard.set(true, forKey: Self.tutorialSeenKey)
+    }
+
+    func setTutorialFrame(_ frame: CGRect, for target: TutorialTarget) {
+        // Skip tiny changes so scrolling doesn't redraw the overlay for nothing.
+        if let old = tutorialFrames[target],
+           abs(old.minX - frame.minX) < 0.5, abs(old.minY - frame.minY) < 0.5,
+           abs(old.width - frame.width) < 0.5, abs(old.height - frame.height) < 0.5 { return }
+        tutorialFrames[target] = frame
     }
 
     // MARK: - Helpers

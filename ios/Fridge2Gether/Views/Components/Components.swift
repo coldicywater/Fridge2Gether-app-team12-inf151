@@ -164,6 +164,7 @@ struct ScreenHeader: View {
                         .background(Circle().fill(Palette.mint))
                         .overlay(Circle().stroke(Palette.ink, lineWidth: 2))
                         .background(Circle().fill(Palette.ink).offset(y: 2))
+                        .tutorialTarget(.chat)
                         .overlay(alignment: .topTrailing) {
                             if unread > 0 {
                                 Text(unread > 9 ? "9+" : "\(unread)")
@@ -218,6 +219,7 @@ struct BottomNav: View {
             navButton(.fridge, icon: "refrigerator", title: "Fridge")
             Color.clear.frame(width: 84)
             navButton(.recipes, icon: "frying.pan", title: "Recipes")
+                .tutorialTarget(.recipes)
         }
         .frame(height: 76)
         .cartoonCard(fill: Color(hex: 0xFFFDF8), radius: 24, shadow: 4)
@@ -232,6 +234,7 @@ struct BottomNav: View {
                     .background(Circle().fill(Color(hex: 0xF5BD3F)))
                     .overlay(Circle().stroke(Palette.ink, lineWidth: 3))
                     .background(Circle().fill(Palette.ink).offset(x: 3, y: 4))
+                    .tutorialTarget(.camera)
             }
             .accessibilityLabel("Scan groceries")
             .offset(y: -30)

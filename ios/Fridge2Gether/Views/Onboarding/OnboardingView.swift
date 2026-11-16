@@ -1,12 +1,12 @@
 import SwiftUI
 
-/// Welcome flow: name → who shares this fridge → create (show invite code) or join with a code.
+/// Welcome flow: intro pages (new users) → name → who shares this fridge → create (show invite code) or join with a code.
 struct OnboardingView: View {
     @Environment(AppStore.self) private var store
 
-    private enum Step { case name, household, roommates, invite, join }
+    private enum Step { case intro, name, household, roommates, invite, join }
 
-    @State private var step: Step = .name
+    @State private var step: Step = .intro
     @State private var name = ""
     @State private var code = ""
     @State private var inviteCode = ""
@@ -16,13 +16,22 @@ struct OnboardingView: View {
 
     private var stepLabel: String {
         switch step {
-        case .name: return "WELCOME · 1 OF 3"
+        case .intro, .name: return "WELCOME · 1 OF 3"
         case .household: return "WELCOME · 2 OF 3"
         case .roommates, .invite, .join: return "WELCOME · 3 OF 3"
         }
     }
 
     var body: some View {
+        if step == .intro && store.userName.isEmpty {
+            IntroView { withAnimation { step = .name } }
+                .transition(.opacity)
+        } else {
+            form
+        }
+    }
+
+    private var form: some View {
         ZStack(alignment: .topTrailing) {
             LinearGradient(colors: [Color(hex: 0xDFF1E9), Color(hex: 0xF9F4E8)], startPoint: .topLeading, endPoint: .bottom)
                 .ignoresSafeArea()
@@ -58,11 +67,12 @@ struct OnboardingView: View {
         .overlay { if busy { ProgressView().tint(Palette.ink).scaleEffect(1.3) } }
         // After leaving your only fridge, your name is kept so you don't have to type it again.
         .onAppear { if name.isEmpty { name = store.userName } }
+        .transition(.opacity)
     }
 
     @ViewBuilder private var content: some View {
         switch step {
-        case .name: nameStep
+        case .intro, .name: nameStep
         case .household: householdStep
         case .roommates: roommatesStep
         case .invite: inviteStep

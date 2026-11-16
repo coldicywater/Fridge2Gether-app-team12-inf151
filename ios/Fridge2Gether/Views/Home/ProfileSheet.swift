@@ -66,6 +66,15 @@ struct ProfileSheet: View {
 
                 fridgesSection
 
+                Button {
+                    save()
+                    dismiss()
+                    store.replayTutorial()
+                } label: {
+                    Label("Show app tutorial", systemImage: "questionmark.circle")
+                }
+                .buttonStyle(SecondaryButtonStyle(fill: Palette.mint))
+
                 Button("Leave this fridge") { confirmLeave = true }
                     .font(AppFont.rounded(13, .black))
                     .foregroundStyle(Palette.danger)

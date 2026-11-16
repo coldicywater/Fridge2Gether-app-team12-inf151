@@ -60,6 +60,13 @@ open Fridge2Gether.xcodeproj
 
 想重置成新用户：删掉 app 重装。
 
+## 新手引导（Week 8）
+
+- **介绍页**（`Views/Onboarding/IntroView.swift`）：新用户第一次打开，先看 3 页介绍：管理食材、追踪过期日期、和室友一起减少浪费。可以左右滑或点 Next，右上角能 Skip。看完才进入输名字、建冰箱或加入冰箱。
+- **首页教程**（`Views/Tutorial/TutorialOverlay.swift`）：第一次进首页时，屏幕变暗，依次高亮相机按钮、冰箱、Recipes 按钮、聊天按钮，每一步一张说明卡片（Camera / Ingredient Management / Recipes / Chat）。每台设备只自动出现一次。
+- **重看教程**：点右上角头像 → Show app tutorial。
+- 想重新看介绍页：删掉 app 重装。
+
 ## 冰箱群聊
 
 首页和菜谱页右上角，头像左边的气泡按钮。每个冰箱一个群，成员就是共享这个冰箱的室友，切换冰箱就换群。有新消息时按钮上有红色数字。

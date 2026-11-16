@@ -41,6 +41,21 @@ struct MainView: View {
             }
         }
         .ignoresSafeArea(.keyboard)
+        .overlay {
+            if store.showTutorial && tab == .fridge && fridgePath.isEmpty {
+                TutorialOverlay()
+            }
+        }
+        .onAppear {
+            // Wait a moment so the home screen has laid out before the spotlight looks for things.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { store.startTutorialIfNeeded() }
+        }
+        .onChange(of: store.showTutorial) {
+            guard store.showTutorial else { return }
+            showProfile = false
+            fridgePath = []
+            tab = .fridge
+        }
         .sheet(item: $detailFood) { food in
             FoodDetailSheet(foodId: food.id, onWhatCanIMake: {
                 // Start the Recipes page with this food picked and recipes made around it.
@@ -145,6 +160,7 @@ struct HomeView: View {
                 }
 
                 FridgeView(onFood: onFood, onCategory: onCategory)
+                    .tutorialTarget(.fridge)
                     .padding(.top, 4)
                     .padding(.bottom, 24)
             }
