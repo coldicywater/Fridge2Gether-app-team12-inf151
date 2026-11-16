@@ -30,9 +30,6 @@ struct FoodDetailSheet: View {
         }
         .background(Palette.card.ignoresSafeArea())
         .presentationDetents([.medium, .large], selection: $detent)
-        // First time: open full height so the tour can reach every button.
-        .onAppear { if store.tourPending(.detail) { detent = .large } }
-        .tour(.detail)
         .onChange(of: panel) {
             if panel != .main { withAnimation { detent = .large } }
         }

@@ -3,6 +3,7 @@ import PhotosUI
 
 /// Camera → AI finds the groceries → Review & Edit → saved to the fridge.
 struct ScanFlowView: View {
+    @Environment(AppStore.self) private var store
     let onDone: () -> Void
 
     private enum Stage { case camera, analyzing, review }
@@ -111,7 +112,7 @@ struct ScanFlowView: View {
                     .disabled(!camera.isAvailable)
                     .opacity(camera.isAvailable ? 1 : 0.35)
                     .accessibilityLabel("Take photo")
-                    .tutorialTarget(.cameraShutter)
+                    .modifier(ShutterTarget(enabled: camera.isAvailable))
                     Spacer()
                     Color.clear.frame(width: 50, height: 50)
                 }
@@ -123,7 +124,7 @@ struct ScanFlowView: View {
         }
         .onAppear { camera.start() }
         .onDisappear { camera.stop() }
-        .tour(.camera)
+        .guideHost(.camera)
     }
 
     // MARK: Analyzing
@@ -172,6 +173,7 @@ struct ScanFlowView: View {
     }
 
     private func analyze(_ image: UIImage) {
+        store.guideEvent(.photoTaken)
         let upright = ImageProcessor.resized(image, maxSide: 1600)
         photo = upright
         stage = .analyzing
@@ -228,5 +230,14 @@ struct ScanFlowView: View {
             unit: "pieces",
             sticker: await ImageProcessor.makeSticker(from: image, box: nil)
         )
+    }
+}
+
+/// The tour points at the shutter only when there's a camera; otherwise at "pick a photo".
+private struct ShutterTarget: ViewModifier {
+    let enabled: Bool
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if enabled { content.tutorialTarget(.cameraShutter) } else { content }
     }
 }

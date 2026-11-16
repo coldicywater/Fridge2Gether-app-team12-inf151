@@ -42,13 +42,30 @@ struct MainView: View {
         }
         .ignoresSafeArea(.keyboard)
         // On the shell so the spotlight covers the bottom nav (camera, Recipes) too.
-        .tour(.home)
-        .onChange(of: store.activeTour) {
-            // Replaying from the profile: go back to the home screen for the Home tour.
-            guard store.activeTour == .home else { return }
+        .guideHost(guideScreen)
+        .onAppear { store.startGuideIfNeeded() }
+        .onChange(of: store.guideIndex) {
+            // Tour (re)starting: begin from the fridge.
+            guard store.guideIndex == 0 else { return }
             showProfile = false
+            showChat = false
+            detailFood = nil
             fridgePath = []
+            recipesPath = []
             tab = .fridge
+        }
+        // Tell the tour what the user just did.
+        .onChange(of: scanning) { store.guideEvent(scanning ? .scanOpened : .scanClosed) }
+        .onChange(of: showChat) { store.guideEvent(showChat ? .chatOpened : .chatClosed) }
+        .onChange(of: showProfile) { store.guideEvent(showProfile ? .profileOpened : .profileClosed) }
+        .onChange(of: tab) { store.guideEvent(tab == .recipes ? .recipesOpened : .recipesLeft) }
+        .onChange(of: recipesPath) {
+            switch recipesPath.last {
+            case nil: store.guideEvent(.recipeListShown)
+            case .detail: store.guideEvent(.recipeOpened)
+            case .cooking: store.guideEvent(.cookingStarted)
+            case .update: store.guideEvent(.cookingFinished)
+            }
         }
         .sheet(item: $detailFood) { food in
             FoodDetailSheet(foodId: food.id, onWhatCanIMake: {
@@ -78,8 +95,8 @@ struct MainView: View {
         }
         .sheet(isPresented: $showProfile) {
             ProfileSheet()
-                // Full height the first time, so the tour can point at the invite code.
-                .presentationDetents(store.tourPending(.profile) ? [.large] : [.medium, .large])
+                // Full height during the tour, so it can point at the invite code.
+                .presentationDetents(store.guideIndex != nil ? [.large] : [.medium, .large])
         }
         .storeErrorAlert()
     }
@@ -96,7 +113,19 @@ struct MainView: View {
         detailFood = food
     }
 
+    /// Which screen of the shell is showing, for the tour.
+    private var guideScreen: GuideScreen {
+        guard tab == .recipes else { return .home }
+        switch recipesPath.last {
+        case nil: return .recipes
+        case .detail: return .recipeDetail
+        case .cooking: return .cooking
+        case .update: return .update
+        }
+    }
+
     private func goHome() {
+        store.guideEvent(.cookingDone)
         recipesPath = []
         fridgePath = []
         tab = .fridge
@@ -120,47 +149,50 @@ struct HomeView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 12) {
-                ScreenHeader(eyebrow: greeting, title: "My Fridge", userName: store.userName, onProfile: onProfile,
-                             onChat: onChat, unread: store.unreadChatCount)
-                    .padding(.bottom, 4)
-
-                if let offer = store.activeOffer {
-                    OfferBanner(offer: offer, onView: {
-                        if let food = store.food(id: offer.foodId) { onFood(food) }
-                    })
-                }
-
-                if store.visibleFoods.isEmpty {
-                    // Tapping the box opens the camera.
-                    Button(action: onScan) {
-                        HStack(spacing: 9) {
-                            Image(systemName: "camera")
-                            VStack(alignment: .leading, spacing: 1) {
-                                Text("Your fridge is empty!").font(AppFont.rounded(13, .black)).foregroundStyle(Palette.ink)
-                                Text("Scan your first groceries to get started.").font(AppFont.rounded(12, .semibold))
-                            }
-                        }
-                        .foregroundStyle(Color(hex: 0x58716B))
-                        .frame(maxWidth: .infinity, minHeight: 58)
-                        .background(RoundedRectangle(cornerRadius: 17).fill(Color.white.opacity(0.5)))
-                        .overlay(RoundedRectangle(cornerRadius: 17).stroke(Color(hex: 0x85A49A), style: StrokeStyle(lineWidth: 1.5, dash: [5, 4])))
-                        .contentShape(RoundedRectangle(cornerRadius: 17))
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(spacing: 12) {
+                    ScreenHeader(eyebrow: greeting, title: "My Fridge", userName: store.userName, onProfile: onProfile,
+                                 onChat: onChat, unread: store.unreadChatCount)
+                        .padding(.bottom, 4)
+    
+                    if let offer = store.activeOffer {
+                        OfferBanner(offer: offer, onView: {
+                            if let food = store.food(id: offer.foodId) { onFood(food) }
+                        })
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Take a photo of your groceries")
-                } else if !store.expiringFoods.isEmpty {
-                    ExpiringWarning(count: store.expiringFoods.count) { onCategory(.expiring) }
-                        .tutorialTarget(.expiringBanner)
+    
+                    if store.visibleFoods.isEmpty {
+                        // Tapping the box opens the camera.
+                        Button(action: onScan) {
+                            HStack(spacing: 9) {
+                                Image(systemName: "camera")
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text("Your fridge is empty!").font(AppFont.rounded(13, .black)).foregroundStyle(Palette.ink)
+                                    Text("Scan your first groceries to get started.").font(AppFont.rounded(12, .semibold))
+                                }
+                            }
+                            .foregroundStyle(Color(hex: 0x58716B))
+                            .frame(maxWidth: .infinity, minHeight: 58)
+                            .background(RoundedRectangle(cornerRadius: 17).fill(Color.white.opacity(0.5)))
+                            .overlay(RoundedRectangle(cornerRadius: 17).stroke(Color(hex: 0x85A49A), style: StrokeStyle(lineWidth: 1.5, dash: [5, 4])))
+                            .contentShape(RoundedRectangle(cornerRadius: 17))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Take a photo of your groceries")
+                    } else if !store.expiringFoods.isEmpty {
+                        ExpiringWarning(count: store.expiringFoods.count) { onCategory(.expiring) }
+                            .tutorialTarget(.expiringBanner)
+                    }
+    
+                    FridgeView(onFood: onFood, onCategory: onCategory)
+                        .padding(.top, 4)
+                        .padding(.bottom, 24)
                 }
-
-                FridgeView(onFood: onFood, onCategory: onCategory)
-                    .padding(.top, 4)
-                    .padding(.bottom, 24)
+                .padding(.horizontal, 18)
+                .padding(.top, 8)
             }
-            .padding(.horizontal, 18)
-            .padding(.top, 8)
+            .guideAutoScroll(proxy)
         }
         .background(ScreenBackground())
         .toolbar(.hidden, for: .navigationBar)

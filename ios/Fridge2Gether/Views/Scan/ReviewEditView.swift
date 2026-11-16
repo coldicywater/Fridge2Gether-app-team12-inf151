@@ -15,49 +15,52 @@ struct ReviewEditView: View {
     private var safeIndex: Int { min(activeIndex, max(items.count - 1, 0)) }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                RoundBackButton(action: onBack)
-                    .padding(.bottom, 14)
-                Text("\(items.count) \(items.count == 1 ? "ITEM" : "ITEMS") FOUND").eyebrowStyle()
-                Text("Review & Edit")
-                    .font(AppFont.rounded(30, .black))
-                    .tracking(-1.2)
-                    .padding(.bottom, 10)
-
-                stickerStrip
-                    .tutorialTarget(.reviewStickers)
-
-                if !items.isEmpty {
-                    let id = items[safeIndex].id
-                    form(item: binding(for: id), id: id)
-                        .id(id)
-                }
-
-                if let errorText {
-                    Text(errorText)
-                        .font(AppFont.rounded(13, .bold))
-                        .foregroundStyle(Palette.danger)
-                        .padding(.top, 10)
-                }
-
-                Button {
-                    save()
-                } label: {
-                    HStack(spacing: 7) {
-                        Text("Add \(validCount) · AI organize")
-                        Image(systemName: "sparkles")
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    RoundBackButton(action: onBack)
+                        .padding(.bottom, 14)
+                    Text("\(items.count) \(items.count == 1 ? "ITEM" : "ITEMS") FOUND").eyebrowStyle()
+                    Text("Review & Edit")
+                        .font(AppFont.rounded(30, .black))
+                        .tracking(-1.2)
+                        .padding(.bottom, 10)
+    
+                    stickerStrip
+                        .tutorialTarget(.reviewStickers)
+    
+                    if !items.isEmpty {
+                        let id = items[safeIndex].id
+                        form(item: binding(for: id), id: id)
+                            .id(id)
                     }
+    
+                    if let errorText {
+                        Text(errorText)
+                            .font(AppFont.rounded(13, .bold))
+                            .foregroundStyle(Palette.danger)
+                            .padding(.top, 10)
+                    }
+    
+                    Button {
+                        save()
+                    } label: {
+                        HStack(spacing: 7) {
+                            Text("Add \(validCount) · AI organize")
+                            Image(systemName: "sparkles")
+                        }
+                    }
+                    .buttonStyle(PrimaryButtonStyle())
+                    .disabled(validCount == 0 || saving)
+                    .tutorialTarget(.reviewAdd)
+                    .padding(.top, 16)
                 }
-                .buttonStyle(PrimaryButtonStyle())
-                .disabled(validCount == 0 || saving)
-                .tutorialTarget(.reviewAdd)
-                .padding(.top, 16)
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
+                .padding(.bottom, 30)
+                .foregroundStyle(Palette.ink)
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 8)
-            .padding(.bottom, 30)
-            .foregroundStyle(Palette.ink)
+            .guideAutoScroll(proxy)
         }
         .scrollDismissesKeyboard(.interactively)
         .background(
@@ -65,7 +68,7 @@ struct ReviewEditView: View {
                 .ignoresSafeArea()
         )
         .overlay { if saving { ProgressView().tint(Palette.ink).scaleEffect(1.3) } }
-        .tour(.review)
+        .guideHost(.review)
     }
 
     private var validCount: Int {
@@ -135,6 +138,7 @@ struct ReviewEditView: View {
                     .textInputAutocapitalization(.words)
                     .fieldStyle()
             }
+            .tutorialTarget(.reviewName)
             VStack(alignment: .leading, spacing: 5) {
                 FieldLabel(text: "Estimated expiry")
                 DatePicker("", selection: item.expiry, displayedComponents: .date)

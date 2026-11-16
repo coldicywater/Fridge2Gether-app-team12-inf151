@@ -48,8 +48,10 @@ final class AppStore {
     /// Set when a save fails, so the UI can say so instead of failing silently.
     var lastError: String?
 
-    /// The guided tour on screen right now, if any.
-    var activeTour: Tour?
+    /// Step of the guided tour on screen (index into Guide.steps), or nil when no tour is running.
+    var guideIndex: Int?
+    /// Foods saved in the last scan, so the tour can point at what you just added.
+    var justAddedFoodIds: [String] = []
     /// Where each tutorial target is on screen, so the overlay can highlight it.
     var tutorialFrames: [TutorialTarget: TargetFrame] = [:]
 
@@ -365,6 +367,7 @@ final class AppStore {
     func addFoods(_ items: [DetectedItem]) async throws {
         guard let fridge else { return }
         let batch = db.batch()
+        var newIds: [String] = []
         for item in items where !item.name.trimmingCharacters(in: .whitespaces).isEmpty {
             let quantity = item.parsedQuantity
             let food = Food(
@@ -380,9 +383,13 @@ final class AppStore {
                 sharedWith: item.sharing == .selected ? item.sharedWith : [],
                 createdAt: Date()
             )
-            try batch.setData(from: food, forDocument: foodsRef(fridge.id).document())
+            let ref = foodsRef(fridge.id).document()
+            newIds.append(ref.documentID)
+            try batch.setData(from: food, forDocument: ref)
         }
         try await batch.commit()
+        justAddedFoodIds = newIds
+        guideEvent(.foodsSaved)
         // Only food shared with everyone is announced, so private items stay private.
         let shared = items
             .filter { $0.sharing == .everyone }
@@ -635,6 +642,7 @@ final class AppStore {
     func makeRecipes(with ids: [String]) async {
         recipesFocus = ids
         await refreshRecipes()
+        guideEvent(.recipesMade)
     }
 
     /// Back to ideas from the whole fridge.
@@ -672,38 +680,86 @@ final class AppStore {
         recipesLoading = false
     }
 
-    // MARK: - Tutorial
+    // MARK: - Guided tour
 
-    /// Not seen on this device yet.
-    func tourPending(_ tour: Tour) -> Bool {
-        !UserDefaults.standard.bool(forKey: tour.seenKey)
+    var guideStep: GuideStep? {
+        guard let guideIndex, Guide.steps.indices.contains(guideIndex) else { return nil }
+        return Guide.steps[guideIndex]
     }
 
-    /// Plays `tour` the first time its screen opens. Waits a moment so the screen has laid out.
-    func startTour(_ tour: Tour) {
-        guard tourPending(tour) else { return }
+    /// The part of the screen the current step points at: the first of its targets that's showing.
+    var guideTarget: TutorialTarget? {
+        guard let step = guideStep else { return nil }
+        return step.targets.first { tutorialFrames[$0] != nil } ?? step.targets.first
+    }
+
+    /// New users see the tour once, after they're in their fridge.
+    func startGuideIfNeeded() {
+        guard !UserDefaults.standard.bool(forKey: Guide.doneKey), guideIndex == nil else { return }
         Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(700))
-            guard activeTour == nil, tourPending(tour) else { return }
-            activeTour = tour
+            try? await Task.sleep(for: .milliseconds(800))
+            guard guideIndex == nil, !UserDefaults.standard.bool(forKey: Guide.doneKey) else { return }
+            withAnimation { guideIndex = 0 }
         }
     }
 
-    func finishTour(_ tour: Tour) {
-        UserDefaults.standard.set(true, forKey: tour.seenKey)
-        if activeTour == tour { withAnimation { activeTour = nil } }
-    }
-
-    /// The screen closed mid-tour: stop, and show it again next time.
-    func cancelTour(_ tour: Tour) {
-        if activeTour == tour { activeTour = nil }
-    }
-
-    /// "Show app tutorial" in the profile: every screen's tour plays again, starting with Home.
+    /// "Show app tutorial" in the profile.
     func replayTutorial() {
-        for tour in Tour.allCases { UserDefaults.standard.removeObject(forKey: tour.seenKey) }
-        activeTour = nil
-        startTour(.home)
+        UserDefaults.standard.removeObject(forKey: Guide.doneKey)
+        Task { @MainActor in
+            // Let the profile sheet close first.
+            try? await Task.sleep(for: .milliseconds(500))
+            withAnimation { guideIndex = 0 }
+        }
+    }
+
+    func guideNext() {
+        guard let guideIndex else { return }
+        goToGuideStep(guideIndex + 1)
+    }
+
+    func endGuide() {
+        UserDefaults.standard.set(true, forKey: Guide.doneKey)
+        withAnimation { guideIndex = nil }
+    }
+
+    /// The app calls this when the user does something. Moves the tour on when it's the action
+    /// the current step is waiting for, and steps back when the user leaves a screen halfway.
+    func guideEvent(_ event: GuideEvent) {
+        guard let index = guideIndex, let step = guideStep else { return }
+        if step.waitFor == event {
+            goToGuideStep(index + 1)
+            return
+        }
+        switch event {
+        case .scanClosed where step.screen == .camera || step.screen == .review:
+            goToGuideStep(stepWaiting(for: .scanOpened))          // closed the camera: tap it again
+        case .chatClosed where step.screen == .chat:
+            goToGuideStep(stepWaiting(for: .chatClosed) + 1)
+        case .profileClosed where step.screen == .profile:
+            goToGuideStep(stepWaiting(for: .profileClosed) + 1)
+        case .recipesLeft where step.screen.isRecipeFlow:
+            goToGuideStep(stepWaiting(for: .recipesOpened))       // went back to the fridge: tap Recipes again
+        case .recipeListShown where [.recipeDetail, .cooking, .update].contains(step.screen):
+            goToGuideStep(stepWaiting(for: .recipeOpened))        // backed out of a recipe: open one again
+        case .recipeOpened, .cookingStarted, .cookingFinished:
+            // Moving around inside a recipe (opened one early, or went back a page): follow along.
+            if step.screen.isRecipeFlow { goToGuideStep(stepWaiting(for: event) + 1) }
+        default:
+            break
+        }
+    }
+
+    private func stepWaiting(for event: GuideEvent) -> Int {
+        Guide.steps.firstIndex { $0.waitFor == event } ?? 0
+    }
+
+    private func goToGuideStep(_ index: Int) {
+        if index >= Guide.steps.count {
+            endGuide()
+        } else {
+            withAnimation { guideIndex = index }
+        }
     }
 
     func setTutorialFrame(_ rect: CGRect, for target: TutorialTarget, owner: UUID) {

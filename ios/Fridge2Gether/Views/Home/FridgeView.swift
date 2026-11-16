@@ -52,6 +52,12 @@ struct FridgeView: View {
     }
 
     @ViewBuilder
+    private var tourFoodId: String? {
+        let shown = store.personalFoods + store.sharedFoods
+        if let added = shown.first(where: { store.justAddedFoodIds.contains($0.id) }) { return added.id }
+        return shown.first?.id
+    }
+
     private func sticker(_ food: Food) -> some View {
         let button = Button { onFood(food) } label: {
             StickerView(
@@ -61,8 +67,8 @@ struct FridgeView: View {
             )
         }
         .buttonStyle(.plain)
-        // The tour points at the first food on the top shelf.
-        if food.id == (store.personalFoods.first ?? store.sharedFoods.first)?.id {
+        // The tour points at the food you just added, or else the first food on the top shelf.
+        if food.id == tourFoodId {
             button.tutorialTarget(.food)
         } else {
             button

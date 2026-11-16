@@ -23,154 +23,149 @@ struct RecipesView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                ScreenHeader(eyebrow: "RECIPES FOR YOUR FRIDGE", title: "Cook it soon", userName: store.userName, onProfile: onProfile,
-                             onChat: onChat, unread: store.unreadChatCount)
-                    .padding(.horizontal, 18)
-                    .padding(.bottom, 16)
-
-                // Pick ingredients to cook with
-                VStack(alignment: .leading, spacing: 10) {
-                    sectionTitle("Pick what to cook with", trailing: selected.isEmpty ? nil : "\(selected.count) picked")
-                    if store.visibleFoods.isEmpty {
-                        Text("Your fridge is empty")
-                            .font(AppFont.hand(16))
-                            .foregroundStyle(Color(hex: 0x5F7770))
-                            .padding(.vertical, 6)
-                    } else {
-                        Text("Tap ingredients, then make recipes that use all of them.")
-                            .font(AppFont.rounded(11, .semibold))
-                            .foregroundStyle(Color(hex: 0x5F7770))
-                        if !store.expiringFoods.isEmpty {
-                            pickRow("USE THESE FIRST", foods: store.expiringFoods)
-                        }
-                        let fresh = store.visibleFoods.filter { $0.freshness == .fresh }
-                        if !fresh.isEmpty {
-                            pickRow("ALSO IN YOUR FRIDGE", foods: fresh)
-                        }
-                        if !selected.isEmpty {
-                            HStack(spacing: 8) {
-                                Button {
-                                    Task { await store.makeRecipes(with: selectedInOrder) }
-                                } label: {
-                                    Label("Make recipes with \(selected.count == 1 ? "it" : "these \(selected.count)")", systemImage: "sparkles")
-                                }
-                                .buttonStyle(PrimaryButtonStyle())
-                                .disabled(store.recipesLoading)
-                                Button("Clear") { store.recipeSelection = [] }
-                                    .buttonStyle(SecondaryButtonStyle())
-                                    .frame(width: 84)
-                            }
-                            .padding(.top, 2)
-                        }
-                    }
-                }
-                .padding(EdgeInsets(top: 13, leading: 18, bottom: 12, trailing: 18))
-                .tutorialTarget(.recipePick)
-                .background(Color(hex: 0xDFF1EA))
-                .overlay(alignment: .top) { Rectangle().fill(Palette.ink).frame(height: 2) }
-                .overlay(alignment: .bottom) { Rectangle().fill(Palette.ink).frame(height: 2) }
-
-                // Made for your fridge
-                VStack(alignment: .leading, spacing: 11) {
-                    HStack {
-                        Text(focusTitle)
-                            .font(AppFont.rounded(16, .black))
-                            .lineLimit(2)
-                        Spacer()
-                        Button {
-                            Task { await store.refreshRecipes() }
-                        } label: {
-                            Label("New ideas", systemImage: "arrow.clockwise")
-                                .font(AppFont.rounded(11, .black))
-                                .foregroundStyle(Palette.muted)
-                                .padding(.vertical, 4)
-                        }
-                        .tutorialTarget(.recipeRefresh)
-                        .disabled(store.recipesLoading)
-                    }
-                    if !store.recipesFocus.isEmpty {
-                        Button {
-                            Task { await store.clearRecipeFocus() }
-                        } label: {
-                            Label("Show ideas for the whole fridge", systemImage: "xmark.circle")
-                                .font(AppFont.rounded(11, .black))
-                                .foregroundStyle(Palette.sharedText)
-                        }
-                        .disabled(store.recipesLoading)
-                    }
-                    if store.recipesLoading && !store.recipes.isEmpty {
-                        HStack(spacing: 8) {
-                            ProgressView().tint(Palette.ink)
-                            Text("Making new recipes...")
-                                .font(AppFont.rounded(12, .bold))
-                                .foregroundStyle(Palette.muted)
-                        }
-                    }
-
-                    HStack(spacing: 7) {
-                        Image(systemName: "sparkles").font(.system(size: 14))
-                        TextField("Search recipes or ingredients", text: $query)
-                            .font(AppFont.rounded(13, .semibold))
-                    }
-                    .foregroundStyle(Palette.ink)
-                    .padding(.horizontal, 11)
-                    .frame(height: 42)
-                    .background(RoundedRectangle(cornerRadius: 13).fill(.white))
-                    .overlay(RoundedRectangle(cornerRadius: 13).stroke(Color(hex: 0xB8C4BF), lineWidth: 1.5))
-
-                    if store.recipesLoading && store.recipes.isEmpty {
-                        VStack(spacing: 10) {
-                            ProgressView().tint(Palette.ink)
-                            Text("Cooking up ideas from your fridge...")
-                                .font(AppFont.rounded(13, .bold))
-                                .foregroundStyle(Palette.muted)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 30)
-                    } else if let error = store.recipesError, store.recipes.isEmpty {
-                        VStack(spacing: 10) {
-                            Text(error)
-                                .font(AppFont.rounded(13, .semibold))
-                                .foregroundStyle(Palette.danger)
-                                .multilineTextAlignment(.center)
-                            Button("Try again") { Task { await store.refreshRecipes() } }
-                                .buttonStyle(SecondaryButtonStyle())
-                                .frame(width: 160)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 20)
-                    }
-
-                    ForEach(filtered) { recipe in
-                        let card = Button { path.append(.detail(recipe)) } label: { RecipeCard(recipe: recipe) }
-                            .buttonStyle(.plain)
-                        if recipe.id == filtered.first?.id {
-                            card.tutorialTarget(.recipeCard)
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    ScreenHeader(eyebrow: "RECIPES FOR YOUR FRIDGE", title: "Cook it soon", userName: store.userName, onProfile: onProfile,
+                                 onChat: onChat, unread: store.unreadChatCount)
+                        .padding(.horizontal, 18)
+                        .padding(.bottom, 16)
+    
+                    // Pick ingredients to cook with
+                    VStack(alignment: .leading, spacing: 10) {
+                        sectionTitle("Pick what to cook with", trailing: selected.isEmpty ? nil : "\(selected.count) picked")
+                        if store.visibleFoods.isEmpty {
+                            Text("Your fridge is empty")
+                                .font(AppFont.hand(16))
+                                .foregroundStyle(Color(hex: 0x5F7770))
+                                .padding(.vertical, 6)
                         } else {
-                            card
+                            Text("Tap ingredients, then make recipes that use all of them.")
+                                .font(AppFont.rounded(11, .semibold))
+                                .foregroundStyle(Color(hex: 0x5F7770))
+                            if !store.expiringFoods.isEmpty {
+                                pickRow("USE THESE FIRST", foods: store.expiringFoods)
+                            }
+                            let fresh = store.visibleFoods.filter { $0.freshness == .fresh }
+                            if !fresh.isEmpty {
+                                pickRow("ALSO IN YOUR FRIDGE", foods: fresh)
+                            }
+                            if !selected.isEmpty {
+                                HStack(spacing: 8) {
+                                    Button {
+                                        Task { await store.makeRecipes(with: selectedInOrder) }
+                                    } label: {
+                                        Label("Make recipes with \(selected.count == 1 ? "it" : "these \(selected.count)")", systemImage: "sparkles")
+                                    }
+                                    .buttonStyle(PrimaryButtonStyle())
+                                    .disabled(store.recipesLoading)
+                                    .tutorialTarget(.recipeMake)
+                                    Button("Clear") { store.recipeSelection = [] }
+                                        .buttonStyle(SecondaryButtonStyle())
+                                        .frame(width: 84)
+                                }
+                                .padding(.top, 2)
+                            }
                         }
                     }
-                    .opacity(store.recipesLoading ? 0.5 : 1)
+                    .padding(EdgeInsets(top: 13, leading: 18, bottom: 12, trailing: 18))
+                    .tutorialTarget(.recipePick)
+                    .background(Color(hex: 0xDFF1EA))
+                    .overlay(alignment: .top) { Rectangle().fill(Palette.ink).frame(height: 2) }
+                    .overlay(alignment: .bottom) { Rectangle().fill(Palette.ink).frame(height: 2) }
+    
+                    // Made for your fridge
+                    VStack(alignment: .leading, spacing: 11) {
+                        HStack {
+                            Text(focusTitle)
+                                .font(AppFont.rounded(16, .black))
+                                .lineLimit(2)
+                            Spacer()
+                            Button {
+                                Task { await store.refreshRecipes() }
+                            } label: {
+                                Label("New ideas", systemImage: "arrow.clockwise")
+                                    .font(AppFont.rounded(11, .black))
+                                    .foregroundStyle(Palette.muted)
+                                    .padding(.vertical, 4)
+                            }
+                            .tutorialTarget(.recipeRefresh)
+                            .disabled(store.recipesLoading)
+                        }
+                        if !store.recipesFocus.isEmpty {
+                            Button {
+                                Task { await store.clearRecipeFocus() }
+                            } label: {
+                                Label("Show ideas for the whole fridge", systemImage: "xmark.circle")
+                                    .font(AppFont.rounded(11, .black))
+                                    .foregroundStyle(Palette.sharedText)
+                            }
+                            .disabled(store.recipesLoading)
+                        }
+                        if store.recipesLoading && !store.recipes.isEmpty {
+                            HStack(spacing: 8) {
+                                ProgressView().tint(Palette.ink)
+                                Text("Making new recipes...")
+                                    .font(AppFont.rounded(12, .bold))
+                                    .foregroundStyle(Palette.muted)
+                            }
+                        }
+    
+                        HStack(spacing: 7) {
+                            Image(systemName: "sparkles").font(.system(size: 14))
+                            TextField("Search recipes or ingredients", text: $query)
+                                .font(AppFont.rounded(13, .semibold))
+                        }
+                        .foregroundStyle(Palette.ink)
+                        .padding(.horizontal, 11)
+                        .frame(height: 42)
+                        .background(RoundedRectangle(cornerRadius: 13).fill(.white))
+                        .overlay(RoundedRectangle(cornerRadius: 13).stroke(Color(hex: 0xB8C4BF), lineWidth: 1.5))
+    
+                        if store.recipesLoading && store.recipes.isEmpty {
+                            VStack(spacing: 10) {
+                                ProgressView().tint(Palette.ink)
+                                Text("Cooking up ideas from your fridge...")
+                                    .font(AppFont.rounded(13, .bold))
+                                    .foregroundStyle(Palette.muted)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 30)
+                        } else if let error = store.recipesError, store.recipes.isEmpty {
+                            VStack(spacing: 10) {
+                                Text(error)
+                                    .font(AppFont.rounded(13, .semibold))
+                                    .foregroundStyle(Palette.danger)
+                                    .multilineTextAlignment(.center)
+                                Button("Try again") { Task { await store.refreshRecipes() } }
+                                    .buttonStyle(SecondaryButtonStyle())
+                                    .frame(width: 160)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 20)
+                        }
+    
+                        ForEach(filtered) { recipe in
+                            let card = Button { path.append(.detail(recipe)) } label: { RecipeCard(recipe: recipe) }
+                                .buttonStyle(.plain)
+                            if recipe.id == filtered.first?.id {
+                                card.tutorialTarget(.recipeCard)
+                            } else {
+                                card
+                            }
+                        }
+                        .opacity(store.recipesLoading ? 0.5 : 1)
+                    }
+                    .padding(EdgeInsets(top: 15, leading: 18, bottom: 20, trailing: 18))
                 }
-                .padding(EdgeInsets(top: 15, leading: 18, bottom: 20, trailing: 18))
+                .padding(.top, 8)
+                .foregroundStyle(Palette.ink)
             }
-            .padding(.top, 8)
-            .foregroundStyle(Palette.ink)
+            .guideAutoScroll(proxy)
         }
         .background(ScreenBackground())
         .toolbar(.hidden, for: .navigationBar)
         .task { await store.loadRecipesIfNeeded() }
-        // Waits for the first recipes so the tour can point at one.
-        .onChange(of: store.recipes.isEmpty) {
-            if !store.recipes.isEmpty { store.startTour(.recipes) }
-        }
-        .onAppear { if !store.recipes.isEmpty { store.startTour(.recipes) } }
-        .onDisappear { store.cancelTour(.recipes) }
-        .overlay {
-            if store.activeTour == .recipes { TutorialOverlay(tour: .recipes) }
-        }
     }
 
     /// Picked ingredients that are still in the fridge.
@@ -201,7 +196,12 @@ struct RecipesView: View {
                         let picked = selected.contains(food.id)
                         Button {
                             withAnimation(.spring(duration: 0.2)) {
-                                if picked { store.recipeSelection.remove(food.id) } else { store.recipeSelection.insert(food.id) }
+                                if picked {
+                                    store.recipeSelection.remove(food.id)
+                                } else {
+                                    store.recipeSelection.insert(food.id)
+                                    store.guideEvent(.foodPicked)
+                                }
                             }
                         } label: {
                             StickerView(food: food, size: .small)

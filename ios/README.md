@@ -60,19 +60,18 @@ open Fridge2Gether.xcodeproj
 
 想重置成新用户：删掉 app 重装。
 
-## 新手引导（Week 8）
+## 新手引导
 
 - **介绍页**（`Views/Onboarding/IntroView.swift`）：新用户第一次打开，先看 3 页一句话介绍，再输名字、建冰箱或加入冰箱。
-- **分页面教程**（`Views/Tutorial/TutorialOverlay.swift`）：每个页面第一次打开时，屏幕变暗，高亮具体按钮，一步一句话：
-  - 首页：Personal、Shared、点食物、快过期横幅、相机、Recipes、聊天、头像
-  - 食物详情：改用量、改过期日期、Used Up、共享、做菜
-  - 拍照：快门、从相册选
-  - 识别结果：选食物、数量和量词、过期日期、共享、保存
-  - 菜谱：挑食材、打开菜谱、换一批
-  - 聊天：+（要食物 / 送食物）、发消息
-  - 头像资料：邀请码、切换和加入冰箱
-- 页面上没有的东西会自动跳过（比如没室友就不讲 Shared）。
-- **重看教程**：头像 → Show app tutorial，所有页面的教程都会重新出现。
+- **动手引导**（`Views/Tutorial/TutorialOverlay.swift`）：进入冰箱后自动开始，是一条连贯的流程，用户要真的点按钮、拍照、做菜。屏幕变暗，高亮要点的地方；卡片上写 "Your turn" 的步骤要用户自己去点，其他步骤点 Next：
+  1. **Add food**：点相机 → 拍一张（没相机就从相册选）→ Review & Edit 里介绍名字、数量、日期、共享 → 点 Add 保存
+  2. **Your fridge**：指着刚拍的食物，讲外圈颜色（白 / 黄 / 红），Personal、Shared（有室友才有），快过期横幅和过期通知
+  3. **Chat**：点开聊天 → + 和输入框 → 关掉
+  4. **Roommates**：点头像 → 邀请码让冰箱变成多人共享 → 切换冰箱 → 关掉
+  5. **Recipes**：点 Recipes → 选食材 → Make recipes → 打开一道菜 → Start Cooking → 一步步做到 Finish → 更新剩余用量
+- 中途关掉某个页面会自动回到那一段的开头（比如没拍照就关了相机，会再提示点相机）。
+- 页面上没有的东西自动跳过（比如没室友就不讲 Shared）。
+- 随时可以点 **Skip tour** 跳过。想再看一次：头像 → **Show app tutorial**。
 - 想重新看介绍页：删掉 app 重装。
 
 ## 冰箱群聊

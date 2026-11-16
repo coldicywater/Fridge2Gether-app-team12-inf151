@@ -49,7 +49,7 @@ struct ChatView: View {
                 .presentationDragIndicator(.visible)
         }
         .storeErrorAlert()
-        .tour(.chat)
+        .guideHost(.chat)
     }
 
     // MARK: Header
@@ -79,6 +79,7 @@ struct ChatView: View {
                     .overlay(Circle().stroke(Palette.ink, lineWidth: 2))
             }
             .accessibilityLabel("Close chat")
+            .tutorialTarget(.chatClose)
         }
         .padding(.horizontal, 18)
         .padding(.top, 22)

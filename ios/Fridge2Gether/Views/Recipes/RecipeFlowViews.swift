@@ -26,63 +26,67 @@ struct RecipeDetailView: View {
     @Binding var path: [RecipeRoute]
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                RecipeArt(recipe: recipe, emojiSize: 96)
-                    .frame(height: 245)
-                    .overlay(alignment: .bottom) { Rectangle().fill(Palette.ink).frame(height: 3) }
-
+        ScrollViewReader { proxy in
+            ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    Text("MADE FOR YOUR FRIDGE").eyebrowStyle()
-                    Text(recipe.name)
-                        .font(AppFont.rounded(28, .black))
-                        .padding(.top, 2)
-                        .padding(.bottom, 9)
-                    HStack(spacing: 9) {
-                        metaChip(icon: "clock", text: "\(recipe.minutes) min")
-                        metaChip(icon: "person.2", text: "\(recipe.servings) servings")
-                    }
-
-                    heading("What you’ll need")
-                    VStack(spacing: 6) {
-                        ForEach(recipe.ingredients.indices, id: \.self) { i in
-                            ingredientRow(recipe.ingredients[i])
+                    RecipeArt(recipe: recipe, emojiSize: 96)
+                        .frame(height: 245)
+                        .overlay(alignment: .bottom) { Rectangle().fill(Palette.ink).frame(height: 3) }
+    
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text("MADE FOR YOUR FRIDGE").eyebrowStyle()
+                        Text(recipe.name)
+                            .font(AppFont.rounded(28, .black))
+                            .padding(.top, 2)
+                            .padding(.bottom, 9)
+                        HStack(spacing: 9) {
+                            metaChip(icon: "clock", text: "\(recipe.minutes) min")
+                            metaChip(icon: "person.2", text: "\(recipe.servings) servings")
                         }
-                    }
-
-                    heading("Instructions")
-                    VStack(alignment: .leading, spacing: 10) {
-                        ForEach(recipe.steps.indices, id: \.self) { i in
-                            HStack(alignment: .top, spacing: 9) {
-                                Text("\(i + 1)")
-                                    .font(AppFont.hand(17))
-                                    .frame(width: 28, height: 28)
-                                    .background(Circle().fill(Palette.yellow))
-                                    .overlay(Circle().stroke(Palette.ink, lineWidth: 1.5))
-                                Text(recipe.steps[i])
-                                    .font(AppFont.rounded(14, .semibold))
-                                    .lineSpacing(3)
-                                    .padding(.top, 4)
+    
+                        heading("What you’ll need")
+                        VStack(spacing: 6) {
+                            ForEach(recipe.ingredients.indices, id: \.self) { i in
+                                ingredientRow(recipe.ingredients[i])
                             }
                         }
+    
+                        heading("Instructions")
+                        VStack(alignment: .leading, spacing: 10) {
+                            ForEach(recipe.steps.indices, id: \.self) { i in
+                                HStack(alignment: .top, spacing: 9) {
+                                    Text("\(i + 1)")
+                                        .font(AppFont.hand(17))
+                                        .frame(width: 28, height: 28)
+                                        .background(Circle().fill(Palette.yellow))
+                                        .overlay(Circle().stroke(Palette.ink, lineWidth: 1.5))
+                                    Text(recipe.steps[i])
+                                        .font(AppFont.rounded(14, .semibold))
+                                        .lineSpacing(3)
+                                        .padding(.top, 4)
+                                }
+                            }
+                        }
+    
+                        Button("Start Cooking") { path.append(.cooking(recipe)) }
+                            .buttonStyle(PrimaryButtonStyle())
+                            .tutorialTarget(.recipeStart)
+                            .disabled(recipe.steps.isEmpty)
+                            .padding(.top, 20)
+                        if recipe.steps.isEmpty {
+                            Text("This recipe came back without steps. Go back and tap New ideas.")
+                                .font(AppFont.rounded(12, .semibold))
+                                .foregroundStyle(Palette.muted)
+                                .frame(maxWidth: .infinity)
+                                .multilineTextAlignment(.center)
+                                .padding(.top, 8)
+                        }
                     }
-
-                    Button("Start Cooking") { path.append(.cooking(recipe)) }
-                        .buttonStyle(PrimaryButtonStyle())
-                        .disabled(recipe.steps.isEmpty)
-                        .padding(.top, 20)
-                    if recipe.steps.isEmpty {
-                        Text("This recipe came back without steps. Go back and tap New ideas.")
-                            .font(AppFont.rounded(12, .semibold))
-                            .foregroundStyle(Palette.muted)
-                            .frame(maxWidth: .infinity)
-                            .multilineTextAlignment(.center)
-                            .padding(.top, 8)
-                    }
+                    .padding(EdgeInsets(top: 18, leading: 20, bottom: 20, trailing: 20))
                 }
-                .padding(EdgeInsets(top: 18, leading: 20, bottom: 20, trailing: 20))
+                .foregroundStyle(Palette.ink)
             }
-            .foregroundStyle(Palette.ink)
+            .guideAutoScroll(proxy)
         }
         .background(ScreenBackground())
         .overlay(alignment: .topLeading) {
@@ -203,6 +207,7 @@ struct CookingView: View {
                     }
                 }
                 .buttonStyle(PrimaryButtonStyle())
+                .tutorialTarget(.cookingNext)
             }
         }
         .padding(.horizontal, 24)
@@ -235,65 +240,69 @@ struct UpdateIngredientsView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                Text("ONE LAST THING").eyebrowStyle()
-                Text("Update Ingredients Used")
-                    .font(AppFont.rounded(27, .black))
-                    .padding(.top, 3)
-                    .padding(.bottom, 5)
-                Text("We estimated what’s left from the recipe. Adjust anything, then save.")
-                    .font(AppFont.rounded(13, .semibold))
-                    .foregroundStyle(Color(hex: 0x62736F))
-                    .padding(.bottom, 16)
-
-                if fridgeFoods.isEmpty {
-                    Text("This recipe didn’t use anything from your fridge.")
-                        .font(AppFont.hand(17))
-                        .foregroundStyle(Palette.muted)
-                        .padding(.vertical, 20)
-                }
-
-                VStack(spacing: 10) {
-                    ForEach(fridgeFoods) { food in
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack(spacing: 6) {
-                                StickerView(food: food, size: .small, showLabel: false)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(food.name).font(AppFont.rounded(15, .black))
-                                    Text("\(food.quantityLabel) before cooking")
-                                        .font(AppFont.rounded(11, .semibold))
-                                        .foregroundStyle(Palette.muted)
-                                }
-                            }
-                            PortionSelector(
-                                value: Binding(
-                                    get: { portions[food.id] ?? estimatedPortion(for: food) },
-                                    set: { portions[food.id] = $0 }
-                                ),
-                                compact: true
-                            )
-                        }
-                        .padding(9)
-                        .background(RoundedRectangle(cornerRadius: 16).fill(Palette.card))
-                        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color(hex: 0xBFCAC5), lineWidth: 1.5))
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("ONE LAST THING").eyebrowStyle()
+                    Text("Update Ingredients Used")
+                        .font(AppFont.rounded(27, .black))
+                        .padding(.top, 3)
+                        .padding(.bottom, 5)
+                    Text("We estimated what’s left from the recipe. Adjust anything, then save.")
+                        .font(AppFont.rounded(13, .semibold))
+                        .foregroundStyle(Color(hex: 0x62736F))
+                        .padding(.bottom, 16)
+    
+                    if fridgeFoods.isEmpty {
+                        Text("This recipe didn’t use anything from your fridge.")
+                            .font(AppFont.hand(17))
+                            .foregroundStyle(Palette.muted)
+                            .padding(.vertical, 20)
                     }
+    
+                    VStack(spacing: 10) {
+                        ForEach(fridgeFoods) { food in
+                            VStack(alignment: .leading, spacing: 6) {
+                                HStack(spacing: 6) {
+                                    StickerView(food: food, size: .small, showLabel: false)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(food.name).font(AppFont.rounded(15, .black))
+                                        Text("\(food.quantityLabel) before cooking")
+                                            .font(AppFont.rounded(11, .semibold))
+                                            .foregroundStyle(Palette.muted)
+                                    }
+                                }
+                                PortionSelector(
+                                    value: Binding(
+                                        get: { portions[food.id] ?? estimatedPortion(for: food) },
+                                        set: { portions[food.id] = $0 }
+                                    ),
+                                    compact: true
+                                )
+                            }
+                            .padding(9)
+                            .background(RoundedRectangle(cornerRadius: 16).fill(Palette.card))
+                            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color(hex: 0xBFCAC5), lineWidth: 1.5))
+                        }
+                    }
+    
+                    Button("Save ingredient updates") { save() }
+                        .buttonStyle(PrimaryButtonStyle())
+                        .tutorialTarget(.updateSave)
+                        .disabled(saving)
+                        .padding(.top, 14)
+                    Button("Save later · Return to fridge", action: onGoHome)
+                        .font(AppFont.rounded(13, .black))
+                        .foregroundStyle(Color(hex: 0x367D64))
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 16)
                 }
-
-                Button("Save ingredient updates") { save() }
-                    .buttonStyle(PrimaryButtonStyle())
-                    .disabled(saving)
-                    .padding(.top, 14)
-                Button("Save later · Return to fridge", action: onGoHome)
-                    .font(AppFont.rounded(13, .black))
-                    .foregroundStyle(Color(hex: 0x367D64))
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, 16)
+                .padding(.horizontal, 18)
+                .padding(.top, 40)
+                .padding(.bottom, 30)
+                .foregroundStyle(Palette.ink)
             }
-            .padding(.horizontal, 18)
-            .padding(.top, 40)
-            .padding(.bottom, 30)
-            .foregroundStyle(Palette.ink)
+            .guideAutoScroll(proxy)
         }
         .background(ScreenBackground())
     }
