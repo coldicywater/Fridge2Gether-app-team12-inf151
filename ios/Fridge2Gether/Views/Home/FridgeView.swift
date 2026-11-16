@@ -51,13 +51,13 @@ struct FridgeView: View {
             .frame(width: 36, height: 14)
     }
 
-    @ViewBuilder
     private var tourFoodId: String? {
         let shown = store.personalFoods + store.sharedFoods
         if let added = shown.first(where: { store.justAddedFoodIds.contains($0.id) }) { return added.id }
         return shown.first?.id
     }
 
+    @ViewBuilder
     private func sticker(_ food: Food) -> some View {
         let button = Button { onFood(food) } label: {
             StickerView(
