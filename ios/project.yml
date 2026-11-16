@@ -14,6 +14,17 @@ packages:
     url: https://github.com/firebase/firebase-ios-sdk
     from: 11.0.0
 
+# Written out so the scheme always exists after running xcodegen (otherwise Xcode can show "No Scheme").
+schemes:
+  Fridge2Gether:
+    build:
+      targets:
+        Fridge2Gether: all
+    run:
+      config: Debug
+    archive:
+      config: Release
+
 targets:
   Fridge2Gether:
     type: application
