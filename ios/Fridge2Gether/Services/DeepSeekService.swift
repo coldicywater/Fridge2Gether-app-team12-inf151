@@ -154,8 +154,17 @@ enum DeepSeekService {
         let (data, response) = try await URLSession.shared.data(for: request)
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         guard (200..<300).contains(status) else {
-            let detail = String(data: data, encoding: .utf8) ?? ""
-            throw AppError.message("AI request failed (\(status)). \(detail.prefix(160))")
+            // The Worker answers with {"error": "..."}; anything else (an HTML page) means the address is wrong.
+            let detail = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])
+                .flatMap { $0["error"] as? String ?? ($0["error"] as? [String: Any])?["message"] as? String }
+            switch status {
+            case 401:
+                throw AppError.message("AI server rejected the sign-in. Check FIREBASE_PROJECT_ID on the Worker.")
+            case 404 where detail == nil:
+                throw AppError.message("Can't find the AI server. Check AI_PROXY_HOST in Secrets.xcconfig.")
+            default:
+                throw AppError.message("AI request failed (\(status)). \(detail ?? "Try again in a moment.")")
+            }
         }
         guard
             let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
