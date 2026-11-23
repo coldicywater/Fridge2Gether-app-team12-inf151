@@ -568,7 +568,7 @@ final class AppStore {
             "dismissedBy": FieldValue.arrayUnion([uid]),
         ], forDocument: offersRef(fridge.id).document(offer.id))
         let note = message(.event, "\(userName) took \(offer.fromName)'s \(offer.foodName.lowercased()).")
-        try? batch.setData(from: note, forDocument: messagesRef(fridge.id).document())
+        _ = try? batch.setData(from: note, forDocument: messagesRef(fridge.id).document())
         highlightedFoodIds.remove(offer.foodId)
         try? await batch.commit()
     }
