@@ -99,3 +99,8 @@ struct IntroView: View {
         .padding(.horizontal, 30)
     }
 }
+
+// Xcode canvas: Editor → Canvas (⌥⌘↩). Updates as you edit; no phone or sign-in needed.
+#Preview("Intro pages") {
+    IntroView(onDone: {})
+}

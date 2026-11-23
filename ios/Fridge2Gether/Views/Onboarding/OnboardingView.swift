@@ -303,3 +303,10 @@ struct InviteCodeCard: View {
         .cartoonCard(fill: Palette.expiringYellow)
     }
 }
+
+// Xcode canvas: Editor → Canvas (⌥⌘↩). Click through the whole welcome flow without signing in.
+// Runs in preview mode, so nothing is sent to Firebase.
+#Preview("Welcome flow") {
+    OnboardingView(onPreviewClose: {})
+        .environment(AppStore())
+}
