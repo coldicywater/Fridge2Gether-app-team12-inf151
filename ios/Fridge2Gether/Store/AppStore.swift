@@ -53,6 +53,11 @@ final class AppStore {
     var guideIndex: Int?
     /// Replaces the current tip's text for a moment, e.g. "type a name first". Cleared on every step change.
     var guideNote: String?
+    /// Set for a moment when ‹ goes back to a tip on another screen. MainView and ScanFlowView
+    /// watch it and open that screen (close the camera, reopen the chat, go back a recipe page…).
+    var guideRewindScreen: GuideScreen?
+    /// While the screen changes for ‹, the open/close events it causes must not move the tour.
+    private var guideRewinding = false
     /// Foods saved in the last scan, so the tour can point at what you just added.
     var justAddedFoodIds: [String] = []
     /// Where each tutorial target is on screen, so the overlay can highlight it.
@@ -767,13 +772,16 @@ final class AppStore {
         goToGuideStep(guideIndex + 1)
     }
 
-    /// The step the Back button goes to: the closest earlier step on the same screen that can be shown.
-    /// Steps on another screen (the camera after you've taken the photo) can't be gone back to.
+    /// Where ‹ goes: the closest earlier tip that can be shown. If it's on another screen,
+    /// that screen gets reopened, as long as it still can be (see canRewind).
     var guideBackIndex: Int? {
         guard let index = guideIndex, let screen = guideStep?.screen else { return nil }
         var i = index - 1
-        while i >= 0, Guide.steps[i].screen == screen {
+        while i >= 0 {
             let step = Guide.steps[i]
+            if step.screen != screen {
+                return Self.canRewind(from: screen, to: step.screen) ? i : nil
+            }
             if step.waitFor != nil || step.showWithoutTarget || step.targets.contains(where: { tutorialFrames[$0] != nil }) {
                 return i
             }
@@ -782,8 +790,33 @@ final class AppStore {
         return nil
     }
 
+    /// Screens ‹ can take you back to. Not into the food review after it's saved,
+    /// or the "What's left?" page after cooking is done: those are finished.
+    private static func canRewind(from: GuideScreen, to: GuideScreen) -> Bool {
+        switch (from, to) {
+        case (.camera, .home), (.review, .camera),
+             (.chat, .home), (.home, .chat),
+             (.profile, .home), (.home, .profile),
+             (.recipes, .home), (.recipeDetail, .recipes), (.cooking, .recipeDetail), (.update, .cooking):
+            return true
+        default:
+            return false
+        }
+    }
+
     func guideBack() {
-        guard let back = guideBackIndex else { return }
+        guard let back = guideBackIndex, let current = guideStep else { return }
+        let target = Guide.steps[back].screen
+        if target != current.screen {
+            guideRewinding = true
+            guideRewindScreen = target
+            Task { @MainActor in
+                // Long enough for a sheet to close or open.
+                try? await Task.sleep(for: .milliseconds(900))
+                guideRewinding = false
+                guideRewindScreen = nil
+            }
+        }
         goToGuideStep(back)
     }
 
@@ -796,12 +829,14 @@ final class AppStore {
     /// The app calls this when the user does something. Moves the tour on when it's the action
     /// the current step is waiting for, and steps back when the user leaves a screen halfway.
     func guideEvent(_ event: GuideEvent) {
-        guard let index = guideIndex, let step = guideStep else { return }
+        guard !guideRewinding, let index = guideIndex, let step = guideStep else { return }
         if step.waitFor == event {
             goToGuideStep(index + 1)
             return
         }
         switch event {
+        case .photoDiscarded where step.screen == .review:
+            goToGuideStep(stepWaiting(for: .photoTaken))          // went back to the camera: take another
         case .scanClosed where step.screen == .camera || step.screen == .review:
             goToGuideStep(stepWaiting(for: .scanOpened))          // closed the camera: tap it again
         case .chatClosed where step.screen == .chat:

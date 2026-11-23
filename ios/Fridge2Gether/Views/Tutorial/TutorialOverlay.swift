@@ -94,7 +94,7 @@ enum GuideScreen {
 
 /// Things the user does that move the tour along.
 enum GuideEvent {
-    case scanOpened, photoTaken, foodsSaved, scanClosed
+    case scanOpened, photoTaken, photoDiscarded, foodsSaved, scanClosed
     case chatOpened, chatClosed
     case profileOpened, profileClosed
     case recipesOpened, recipesLeft, foodPicked, recipesMade
@@ -353,7 +353,7 @@ private struct GuideOverlay: View {
 
 extension GuideOverlay {
     /// ‹ 3/8 › in the corner of the tip card.
-    /// ‹ goes back to the previous tip on this screen. › is the same as Next; on "Your turn" steps
+    /// ‹ goes back to the previous tip, reopening its screen if needed. › is the same as Next; on "Your turn" steps
     /// it's grey because the next tip lives on the screen your action opens.
     fileprivate func stepper(position: Int) -> some View {
         let canBack = store.guideBackIndex != nil

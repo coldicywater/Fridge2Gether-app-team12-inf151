@@ -54,6 +54,23 @@ struct MainView: View {
             recipesPath = []
             tab = .fridge
         }
+        // ‹ on a tip went back to another screen: open it.
+        .onChange(of: store.guideRewindScreen) {
+            switch store.guideRewindScreen {
+            case .home:
+                scanning = false
+                showChat = false
+                showProfile = false
+                recipesPath = []
+                fridgePath = []
+                tab = .fridge
+            case .chat: showChat = true
+            case .profile: showProfile = true
+            case .recipes: recipesPath = []
+            case .recipeDetail, .cooking: if !recipesPath.isEmpty { recipesPath.removeLast() }
+            case .camera, .review, .update, nil: break
+            }
+        }
         // Tell the tour what the user just did.
         .onChange(of: scanning) { store.guideEvent(scanning ? .scanOpened : .scanClosed) }
         .onChange(of: showChat) { store.guideEvent(showChat ? .chatOpened : .chatClosed) }

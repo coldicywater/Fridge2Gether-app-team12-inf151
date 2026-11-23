@@ -22,8 +22,15 @@ struct ScanFlowView: View {
             case .camera: cameraScreen
             case .analyzing: analyzingScreen
             case .review:
-                ReviewEditView(items: $items, note: aiNote, onBack: retake, onSaved: onDone)
+                ReviewEditView(items: $items, note: aiNote, onBack: {
+                    retake()
+                    store.guideEvent(.photoDiscarded)
+                }, onSaved: onDone)
             }
+        }
+        // ‹ on the first review tip goes back to "Take a photo".
+        .onChange(of: store.guideRewindScreen) {
+            if store.guideRewindScreen == .camera { retake() }
         }
         .onChange(of: pickerItem) { _, newItem in
             guard let newItem else { return }
