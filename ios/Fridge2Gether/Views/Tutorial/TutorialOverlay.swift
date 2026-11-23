@@ -311,11 +311,7 @@ private struct GuideOverlay: View {
                     .tracking(1.2)
                     .foregroundStyle(Palette.eyebrow)
                 Spacer()
-                if sectionSteps.count > 1 {
-                    Text("\(position)/\(sectionSteps.count)")
-                        .font(AppFont.rounded(11, .black))
-                        .foregroundStyle(Palette.muted)
-                }
+                stepper(position: position)
             }
             Text(step.title).font(AppFont.rounded(18, .black))
             Text(store.guideNote ?? step.text)
@@ -329,19 +325,6 @@ private struct GuideOverlay: View {
                         .foregroundStyle(Palette.muted)
                 }
                 Spacer()
-                if store.guideBackIndex != nil {
-                    Button {
-                        store.guideBack()
-                    } label: {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 14, weight: .black))
-                            .frame(width: 36, height: 34)
-                            .background(RoundedRectangle(cornerRadius: 12).fill(Color.white))
-                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Palette.ink, lineWidth: 2))
-                    }
-                    .foregroundStyle(Palette.ink)
-                    .accessibilityLabel("Previous tip")
-                }
                 if step.waitFor == nil {
                     Button(isLast ? "Done" : "Next") { store.guideNext() }
                         .font(AppFont.rounded(14, .black))
@@ -365,6 +348,37 @@ private struct GuideOverlay: View {
         .padding(14)
         .cartoonCard(radius: 18)
         .padding(.horizontal, 26)
+    }
+}
+
+extension GuideOverlay {
+    /// ‹ 3/8 › in the corner of the tip card.
+    /// ‹ goes back to the previous tip on this screen. › is the same as Next; on "Your turn" steps
+    /// it's grey because the next tip lives on the screen your action opens.
+    fileprivate func stepper(position: Int) -> some View {
+        let canBack = store.guideBackIndex != nil
+        let canForward = step.waitFor == nil && index < Guide.steps.count - 1
+        return HStack(spacing: 2) {
+            arrow("chevron.left", enabled: canBack, label: "Previous tip") { store.guideBack() }
+            Text("\(position)/\(sectionSteps.count)")
+                .font(AppFont.rounded(12, .black))
+                .foregroundStyle(Palette.muted)
+                .monospacedDigit()
+                .frame(minWidth: 30)
+            arrow("chevron.right", enabled: canForward, label: "Next tip") { store.guideNext() }
+        }
+    }
+
+    private func arrow(_ icon: String, enabled: Bool, label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 13, weight: .black))
+                .frame(width: 30, height: 28)
+                .contentShape(Rectangle())
+        }
+        .foregroundStyle(Palette.ink.opacity(enabled ? 1 : 0.2))
+        .disabled(!enabled)
+        .accessibilityLabel(label)
     }
 }
 
