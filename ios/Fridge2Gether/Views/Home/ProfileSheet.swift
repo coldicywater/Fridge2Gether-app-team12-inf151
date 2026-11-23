@@ -11,6 +11,7 @@ struct ProfileSheet: View {
     @State private var fridgeError: String?
     @State private var confirmDelete = false
     @State private var deleteError: String?
+    @State private var previewOnboarding = false
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -80,7 +81,18 @@ struct ProfileSheet: View {
                         Label("Show app tutorial", systemImage: "questionmark.circle")
                     }
                     .buttonStyle(SecondaryButtonStyle(fill: Palette.mint))
-    
+
+                    #if DEBUG
+                    // Only in builds run from Xcode, not TestFlight: look at the new-user screens again.
+                    Button {
+                        save()
+                        previewOnboarding = true
+                    } label: {
+                        Label("Preview welcome screens", systemImage: "sparkles")
+                    }
+                    .buttonStyle(SecondaryButtonStyle())
+                    #endif
+
                     Button("Leave this fridge") { confirmLeave = true }
                         .font(AppFont.rounded(13, .black))
                         .foregroundStyle(Palette.danger)
@@ -117,6 +129,9 @@ struct ProfileSheet: View {
             Text(store.fridgeIds.count > 1
                  ? "Your food in this fridge stays with your roommates. You'll switch to your other fridge."
                  : "This is your only fridge. You'll need to start or join a fridge again afterwards.")
+        }
+        .fullScreenCover(isPresented: $previewOnboarding) {
+            OnboardingView(onPreviewClose: { previewOnboarding = false })
         }
         .confirmationDialog("Delete your account?", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("Delete everything", role: .destructive) { deleteAccount() }

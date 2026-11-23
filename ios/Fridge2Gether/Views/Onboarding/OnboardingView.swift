@@ -14,6 +14,11 @@ struct OnboardingView: View {
     @State private var errorText: String?
     @FocusState private var focused: Bool
 
+    /// Set when the profile's "Preview welcome screens" opens this (Debug builds only).
+    /// The whole flow can be clicked through, but nothing is saved and no fridge is created.
+    var onPreviewClose: (() -> Void)? = nil
+    private var isPreview: Bool { onPreviewClose != nil }
+
     private var stepLabel: String {
         switch step {
         case .intro, .name: return "WELCOME · 1 OF 3"
@@ -23,11 +28,25 @@ struct OnboardingView: View {
     }
 
     var body: some View {
-        if step == .intro && store.userName.isEmpty {
-            IntroView { withAnimation { step = .name } }
-                .transition(.opacity)
-        } else {
-            form
+        Group {
+            if step == .intro && (store.userName.isEmpty || isPreview) {
+                IntroView { withAnimation { step = .name } }
+                    .transition(.opacity)
+            } else {
+                form
+            }
+        }
+        .overlay(alignment: .topLeading) {
+            if let onPreviewClose {
+                Button("Exit preview", action: onPreviewClose)
+                    .font(AppFont.rounded(13, .black))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 7)
+                    .background(Capsule().fill(Palette.ink))
+                    .padding(.leading, 16)
+                    .padding(.top, 6)
+            }
         }
     }
 
@@ -106,6 +125,7 @@ struct OnboardingView: View {
             title("Who shares this fridge?")
             subtitle("We’ll use this to make sharing food feel effortless.")
             OptionCard(icon: "lock", title: "I live alone", detail: "Keep everything personal") {
+                if let onPreviewClose { onPreviewClose(); return }
                 run { try await store.createFridge(name: trimmedName) }
             }
             OptionCard(icon: "person.2", title: "With roommates", detail: "Choose who can share") {
@@ -120,6 +140,11 @@ struct OnboardingView: View {
             title("Meet the fridge crew")
             subtitle("One person starts the fridge. Everyone else joins with the invite code.")
             OptionCard(icon: "plus", title: "Start a new fridge", detail: "Get a code to send your roommates") {
+                if isPreview {
+                    inviteCode = "K7QM2P"
+                    step = .invite
+                    return
+                }
                 run {
                     inviteCode = try await store.createFridge(name: trimmedName, enter: false)
                     step = .invite
@@ -137,7 +162,9 @@ struct OnboardingView: View {
             title("Your fridge is ready")
             subtitle("Send this code to your roommates. They pick “Join a roommate’s fridge” and type it in.")
             InviteCodeCard(code: inviteCode)
-            Button("Open my fridge") { store.enterFridge() }
+            Button("Open my fridge") {
+                if let onPreviewClose { onPreviewClose() } else { store.enterFridge() }
+            }
                 .buttonStyle(PrimaryButtonStyle())
                 .padding(.top, 20)
         }
@@ -153,6 +180,7 @@ struct OnboardingView: View {
                 .autocorrectionDisabled()
                 .bigField()
             Button("Join fridge") {
+                if let onPreviewClose { onPreviewClose(); return }
                 run { try await store.joinFridge(name: trimmedName, code: code) }
             }
             .buttonStyle(PrimaryButtonStyle())
