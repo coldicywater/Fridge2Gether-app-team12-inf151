@@ -28,4 +28,4 @@ Deleting the app also removes the local data on your phone.
 
 ## Contact
 
-Questions or deletion requests: liangbaikai2323@gmail.com
+Questions or deletion requests: coldicywater2323@gmail.com
