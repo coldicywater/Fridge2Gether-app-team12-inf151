@@ -9,6 +9,8 @@ struct ProfileSheet: View {
     @State private var joinCode = ""
     @State private var busy = false
     @State private var fridgeError: String?
+    @State private var confirmDelete = false
+    @State private var deleteError: String?
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -84,6 +86,17 @@ struct ProfileSheet: View {
                         .foregroundStyle(Palette.danger)
                         .frame(maxWidth: .infinity)
                         .padding(.top, 8)
+
+                    Button("Delete my account and data") { confirmDelete = true }
+                        .font(AppFont.rounded(12, .bold))
+                        .foregroundStyle(Palette.muted)
+                        .frame(maxWidth: .infinity)
+
+                    if let deleteError {
+                        Text(deleteError)
+                            .font(AppFont.rounded(12, .bold))
+                            .foregroundStyle(Palette.danger)
+                    }
                 }
                 .padding(22)
                 .foregroundStyle(Palette.ink)
@@ -104,6 +117,11 @@ struct ProfileSheet: View {
             Text(store.fridgeIds.count > 1
                  ? "Your food in this fridge stays with your roommates. You'll switch to your other fridge."
                  : "This is your only fridge. You'll need to start or join a fridge again afterwards.")
+        }
+        .confirmationDialog("Delete your account?", isPresented: $confirmDelete, titleVisibility: .visible) {
+            Button("Delete everything", role: .destructive) { deleteAccount() }
+        } message: {
+            Text("Your food is removed from every fridge and you leave all your fridges. Messages you already sent stay in the chat. This can't be undone.")
         }
     }
 
@@ -184,6 +202,19 @@ struct ProfileSheet: View {
             do { try await work() } catch { fridgeError = AppStore.friendly(error) }
             await store.loadMyFridges()
             busy = false
+        }
+    }
+
+    private func deleteAccount() {
+        deleteError = nil
+        busy = true
+        Task {
+            do {
+                try await store.deleteAccount()
+            } catch {
+                deleteError = AppStore.friendly(error)
+                busy = false
+            }
         }
     }
 

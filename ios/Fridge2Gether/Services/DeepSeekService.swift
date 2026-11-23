@@ -1,15 +1,19 @@
 import Foundation
 import UIKit
+import FirebaseAuth
 
-/// Talks to DeepSeek's OpenAI-compatible chat API.
-/// `deepseek-flash` (V4.1 Flash) accepts images, so one model handles both scanning and recipes.
+/// Talks to DeepSeek through our Cloudflare Worker (ai-proxy/worker.js).
+/// The app never holds the DeepSeek key: it sends the user's Firebase ID token,
+/// and the Worker adds the key and picks the model (`deepseek-flash`, which accepts images).
 enum DeepSeekService {
-    private static let endpoint = URL(string: "https://api.deepseek.com/chat/completions")!
-    private static let model = "deepseek-flash"
-
-    private static var apiKey: String {
-        (Bundle.main.object(forInfoDictionaryKey: "DEEPSEEK_API_KEY") as? String ?? "")
+    /// Set AI_PROXY_HOST in Secrets.xcconfig, e.g. fridge2gether-ai.yourname.workers.dev
+    private static var endpoint: URL? {
+        let host = (Bundle.main.object(forInfoDictionaryKey: "AI_PROXY_HOST") as? String ?? "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "https://", with: "")
+            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        guard !host.isEmpty, !host.hasPrefix("$(") else { return nil }
+        return URL(string: "https://\(host)/chat")
     }
 
     // MARK: - Scan groceries
@@ -127,16 +131,19 @@ enum DeepSeekService {
     // MARK: - Networking
 
     private static func chat(messages: [[String: Any]]) async throws -> String {
-        guard !apiKey.isEmpty, !apiKey.hasPrefix("$(") else {
-            throw AppError.message("DeepSeek API key is missing. Add it to Secrets.xcconfig.")
+        guard let endpoint else {
+            throw AppError.message("AI server isn't set up. Add AI_PROXY_HOST to Secrets.xcconfig.")
         }
+        guard let user = Auth.auth().currentUser else {
+            throw AppError.message("Not signed in yet. Try again in a moment.")
+        }
+        let token = try await user.getIDToken()
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
         request.timeoutInterval = 90
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         let body: [String: Any] = [
-            "model": model,
             "messages": messages,
             "response_format": ["type": "json_object"],
             "temperature": 0.4,

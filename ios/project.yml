@@ -35,13 +35,15 @@ targets:
       path: Fridge2Gether/Info.plist
       properties:
         CFBundleDisplayName: Fridge2Gether
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UILaunchScreen:
           UIColorName: LaunchBackground
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         NSCameraUsageDescription: Take a photo of your groceries so Fridge2Gether can add them to your fridge.
         NSPhotoLibraryUsageDescription: Pick a photo of your groceries to add them to your fridge.
         UIAppFonts: [PatrickHand-Regular.ttf]
-        DEEPSEEK_API_KEY: $(DEEPSEEK_API_KEY)
+        AI_PROXY_HOST: $(AI_PROXY_HOST)
         ITSAppUsesNonExemptEncryption: false
     dependencies:
       - package: Firebase

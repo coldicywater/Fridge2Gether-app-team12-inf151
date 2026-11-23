@@ -25,14 +25,29 @@ brew install xcodegen
 
 > 不需要 Firebase Storage，也不需要升级 Blaze 付费方案。食物贴纸图片压缩后直接存在 Firestore 里。
 
-### 3. 放 DeepSeek API key
+### 3. 部署 AI 转发服务器（Cloudflare Worker，免费）
 
-`Secrets.xcconfig` 已经填好 key。这个文件在 `.gitignore` 里，不会被推到 GitHub。队友 clone 之后自己复制一份：
+DeepSeek key 不放在 app 里，放在 Cloudflare Worker 上。app 带着用户的 Firebase 登录凭证请求 Worker，Worker 验证通过后再用 key 调 DeepSeek。代码在仓库根目录 `ai-proxy/worker.js`。
+
+网页操作（手机也能做）：
+
+1. 注册 / 登录 https://dash.cloudflare.com → **Workers & Pages** → **Create** → **Create Worker**，名字填 `fridge2gether-ai`，点 Deploy。
+2. 点 **Edit code**，把 `ai-proxy/worker.js` 整段贴进去替换原来的代码，点 **Deploy**。
+3. 回到这个 Worker → **Settings → Variables and Secrets**：
+   - 加 **Secret** `DEEPSEEK_API_KEY`，值是 DeepSeek key（建议在 DeepSeek 后台新建一个，旧的在聊天里出现过）
+   - 加 **Text** `FIREBASE_PROJECT_ID`，值在 Firebase 控制台 → 齿轮 → Project settings → General → Project ID
+4. 记下 Worker 的地址，形如 `fridge2gether-ai.你的名字.workers.dev`。
+
+或者在 Mac 上用命令行：`cd ai-proxy`，改好 `wrangler.toml` 里的 project ID，然后 `npx wrangler deploy` 和 `npx wrangler secret put DEEPSEEK_API_KEY`。
+
+然后在 app 这边：
 
 ```bash
 cp Secrets.example.xcconfig Secrets.xcconfig
-# 然后把里面的 key 换成真的
+# 把 AI_PROXY_HOST 换成上面记下的地址（不要写 https://）
 ```
+
+`Secrets.xcconfig` 在 `.gitignore` 里，不会被推到 GitHub。
 
 ### 4. 生成工程并运行
 
@@ -121,7 +136,20 @@ fridges/{fridgeId}           inviteCode, memberIds[], memberNames{uid:name}
 
 Freshness 按过期天数算：≤1 天红圈 (urgent)，≤3 天黄圈 (soon)，其余正常。
 
+## 上传 TestFlight
+
+1. **重新发布 Firestore 规则**：`firestore.rules` 收紧了加入冰箱的权限（陌生人只能把自己加进去，不能改别人），整段贴到 Firebase 控制台 Rules 里点 Publish。
+2. **重新跑 `xcodegen`**（新增了 `PrivacyInfo.xcprivacy`，没有它 App Store Connect 会拒收）。
+3. Xcode → 项目 → Signing & Capabilities → Team 选你的付费开发者账号，勾 Automatically manage signing。
+4. 在 https://appstoreconnect.apple.com → My Apps → + New App：Bundle ID 选 `edu.uci.team12.fridge2gether`（第 3 步之后会自动注册出来），名字填 Fridge2Gether（被占用就换一个，比如 Fridge2Gether Team12）。
+5. Xcode 顶部设备选 **Any iOS Device (arm64)** → Product → **Archive** → Distribute App → **TestFlight & App Store** → Upload。
+6. 等 10 到 30 分钟处理完，在 App Store Connect 的 TestFlight 标签里：
+   - **内部测试**（团队成员，最多 100 人，不用审核）：Users and Access 里把队友加进团队，再加进 Internal Testing 组。
+   - **外部测试**（朋友，用邮箱或公开链接）：要填 Test Information（反馈邮箱、简介、隐私政策链接，可以用仓库里 `PRIVACY.md` 的 GitHub 链接），第一次要过 Beta App Review，一般一天内。
+7. 以后每次上传新版本，把 `project.yml` 里的 `CURRENT_PROJECT_VERSION` 加 1，重新 `xcodegen` 再 Archive。同一个版本号不能传两次。
+
+App Store Connect 的 App Privacy 问卷按 `PRIVACY.md` 填：收集 Name、User ID、Photos、Other User Content，都用于 App Functionality，都和用户关联，不用于追踪。
+
 ## 注意
 
-- API key 打包在 app 里，课程 demo 没问题；如果要上 App Store，应该改成走自己的服务器转发。
-- key 已经在聊天里出现过，项目结束后建议在 DeepSeek 后台换一个新的。
+- AI 请求只接受已登录 Fridge2Gether 用户，模型和 token 上限由 Worker 决定，app 改不了。想看用量或换 key，只改 Worker 的设置，不用重新发 app。

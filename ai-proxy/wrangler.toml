@@ -1,0 +1,11 @@
+name = "fridge2gether-ai"
+main = "worker.js"
+compatibility_date = "2026-11-01"
+
+[vars]
+# Firebase console → Project settings → General → Project ID
+FIREBASE_PROJECT_ID = "your-firebase-project-id"
+MODEL = "deepseek-flash"
+
+# The DeepSeek key is a secret, not a var. Set it with:
+#   npx wrangler secret put DEEPSEEK_API_KEY

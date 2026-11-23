@@ -2,6 +2,7 @@ import Foundation
 import SwiftUI
 import FirebaseAuth
 import FirebaseFirestore
+import UserNotifications
 
 /// Single source of truth for the app. Mirrors the state that App.tsx kept in useState,
 /// but backed by Firestore so every roommate sees the same fridge in real time.
@@ -223,6 +224,52 @@ final class AppStore {
             do { try await persistUser() } catch { report(error) }
             phase = .onboarding
         }
+    }
+
+    /// Profile → "Delete my account": removes my food, takes me out of every fridge,
+    /// deletes my profile and sign-in, then starts over as a brand-new user.
+    /// Chat messages I already sent stay in the group, like in other group chats.
+    func deleteAccount() async throws {
+        let openFridge = currentFridgeId
+        detach()
+        do {
+            try await deleteMyData()
+        } catch {
+            // Something failed halfway: put the fridge back on screen so the app keeps working.
+            if !openFridge.isEmpty { attach(fridgeId: openFridge) }
+            throw error
+        }
+
+        UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
+        if let domain = Bundle.main.bundleIdentifier {
+            UserDefaults.standard.removePersistentDomain(forName: domain)
+        }
+        uid = ""
+        userName = ""
+        fridgeIds = []
+        myFridges = []
+        currentFridgeId = ""
+        guideIndex = nil
+        justAddedFoodIds = []
+        phase = .loading
+        await start(firebaseConfigured: true)
+    }
+
+    private func deleteMyData() async throws {
+        // Only fridges I'm still in; one I already left elsewhere would fail the permission check.
+        await loadMyFridges()
+        for fridgeId in myFridges.map(\.id) {
+            let mine = try await foodsRef(fridgeId).whereField("ownerId", isEqualTo: uid).getDocuments()
+            let batch = db.batch()
+            for doc in mine.documents { batch.deleteDocument(doc.reference) }
+            batch.updateData([
+                "memberIds": FieldValue.arrayRemove([uid]),
+                "memberNames.\(uid)": FieldValue.delete(),
+            ], forDocument: db.collection("fridges").document(fridgeId))
+            try await batch.commit()
+        }
+        try await db.collection("users").document(uid).delete()
+        try await Auth.auth().currentUser?.delete()
     }
 
     // MARK: - Live data
