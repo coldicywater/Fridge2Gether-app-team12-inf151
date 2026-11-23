@@ -51,6 +51,8 @@ final class AppStore {
 
     /// Step of the guided tour on screen (index into Guide.steps), or nil when no tour is running.
     var guideIndex: Int?
+    /// Replaces the current tip's text for a moment, e.g. "type a name first". Cleared on every step change.
+    var guideNote: String?
     /// Foods saved in the last scan, so the tour can point at what you just added.
     var justAddedFoodIds: [String] = []
     /// Where each tutorial target is on screen, so the overlay can highlight it.
@@ -765,7 +767,28 @@ final class AppStore {
         goToGuideStep(guideIndex + 1)
     }
 
+    /// The step the Back button goes to: the closest earlier step on the same screen that can be shown.
+    /// Steps on another screen (the camera after you've taken the photo) can't be gone back to.
+    var guideBackIndex: Int? {
+        guard let index = guideIndex, let screen = guideStep?.screen else { return nil }
+        var i = index - 1
+        while i >= 0, Guide.steps[i].screen == screen {
+            let step = Guide.steps[i]
+            if step.waitFor != nil || step.showWithoutTarget || step.targets.contains(where: { tutorialFrames[$0] != nil }) {
+                return i
+            }
+            i -= 1
+        }
+        return nil
+    }
+
+    func guideBack() {
+        guard let back = guideBackIndex else { return }
+        goToGuideStep(back)
+    }
+
     func endGuide() {
+        guideNote = nil
         UserDefaults.standard.set(true, forKey: Guide.doneKey)
         withAnimation { guideIndex = nil }
     }
@@ -805,6 +828,7 @@ final class AppStore {
         if index >= Guide.steps.count {
             endGuide()
         } else {
+            guideNote = nil
             withAnimation { guideIndex = index }
         }
     }

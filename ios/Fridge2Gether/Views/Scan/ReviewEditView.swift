@@ -46,12 +46,13 @@ struct ReviewEditView: View {
                         save()
                     } label: {
                         HStack(spacing: 7) {
-                            Text("Add \(validCount) · AI organize")
+                            Text(validCount == 0 ? "Add to fridge" : "Add \(validCount) · AI organize")
                             Image(systemName: "sparkles")
                         }
                     }
                     .buttonStyle(PrimaryButtonStyle())
-                    .disabled(validCount == 0 || saving)
+                    // Not disabled when nothing is named: tapping explains what's missing instead.
+                    .disabled(saving)
                     .tutorialTarget(.reviewAdd)
                     .padding(.top, 16)
                 }
@@ -69,6 +70,7 @@ struct ReviewEditView: View {
         )
         .overlay { if saving { ProgressView().tint(Palette.ink).scaleEffect(1.3) } }
         .guideHost(.review)
+        .onChange(of: validCount) { if validCount > 0 { store.guideNote = nil } }
     }
 
     private var validCount: Int {
@@ -189,6 +191,13 @@ struct ReviewEditView: View {
     }
 
     private func save() {
+        guard validCount > 0 else {
+            errorText = "Type a food name first."
+            if store.guideIndex != nil {
+                store.guideNote = "Type a food name in the Food Name box first, then tap Add to fridge."
+            }
+            return
+        }
         errorText = nil
         saving = true
         // Selected Roommates with nobody picked falls back to Just Me.

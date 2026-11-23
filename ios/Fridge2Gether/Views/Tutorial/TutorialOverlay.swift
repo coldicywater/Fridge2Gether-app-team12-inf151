@@ -318,17 +318,30 @@ private struct GuideOverlay: View {
                 }
             }
             Text(step.title).font(AppFont.rounded(18, .black))
-            Text(step.text)
+            Text(store.guideNote ?? step.text)
                 .font(AppFont.rounded(14, .semibold))
-                .foregroundStyle(Color(hex: 0x4F6560))
+                .foregroundStyle(store.guideNote == nil ? Color(hex: 0x4F6560) : Palette.danger)
                 .fixedSize(horizontal: false, vertical: true)
-            HStack {
+            HStack(spacing: 10) {
                 if !isLast {
                     Button("Skip tour") { store.endGuide() }
                         .font(AppFont.rounded(13, .black))
                         .foregroundStyle(Palette.muted)
                 }
                 Spacer()
+                if store.guideBackIndex != nil {
+                    Button {
+                        store.guideBack()
+                    } label: {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 14, weight: .black))
+                            .frame(width: 36, height: 34)
+                            .background(RoundedRectangle(cornerRadius: 12).fill(Color.white))
+                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Palette.ink, lineWidth: 2))
+                    }
+                    .foregroundStyle(Palette.ink)
+                    .accessibilityLabel("Previous tip")
+                }
                 if step.waitFor == nil {
                     Button(isLast ? "Done" : "Next") { store.guideNext() }
                         .font(AppFont.rounded(14, .black))
